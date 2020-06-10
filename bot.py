@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 import telebot
-import sqlite3
-from telebot import types
-import time
 import cherrypy
-import os
 
 # Мои файлы
 from config import *
