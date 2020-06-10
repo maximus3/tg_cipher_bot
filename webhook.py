@@ -1,4 +1,4 @@
-from TEMPLATE_config import TOKEN, directory, port, host
+from config import TOKEN, directory, port, host
 
 
 WEBHOOK_HOST = host  # ip/host where the bot is running

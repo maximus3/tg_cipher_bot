@@ -1,4 +1,4 @@
-TOKEN = 'TOKEN' # Telegram bot token
+TOKEN = '' # Telegram bot token
 host = 'HOST' # Server's ip/host
 port = 'PORT' # Bot's port
 directory = '' # Bot's directory
