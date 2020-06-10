@@ -1,3 +1,8 @@
 config.py
 webhook_pkey.pem
 webhook_cert.pem
+cipher_bot.service
+venv/
+__pycache__/
+cipher.log
+data.m3backup

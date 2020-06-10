@@ -1,3 +1,4 @@
+#!/root/tg_cipher_bot/venv/bin/python
 # -*- coding: utf-8 -*-
 import telebot
 
@@ -6,7 +7,7 @@ from aiohttp import web
 import ssl
 
 # Мои файлы
-from TEMPLATE_config import *
+from config import *
 from webhook import *
 from func import *
 from m3crypto import *
