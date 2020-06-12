@@ -1,9 +1,9 @@
-TOKEN = '' # Telegram bot token
-host = 'HOST' # Server's ip/host
-port = 'PORT' # Bot's port
-directory = '' # Bot's directory
-DATA_BACKUP_FILE = '' # Name of Database
+TOKEN = '<TOKEN FOR TELEGRAM BOT'  # Telegram bot token
+host = '<IP/HOST OF SERVER'  # Server's ip/host
+port = '<PORT>'  # Bot's port; 443, 80, 88 or 8443 (port need to be 'open')
+directory = '<BOT DIRECTORY ON SERVER>'  # Bot's directory
+DATA_BACKUP_FILE = '<FILE TO BACKUP DATA>'  # Name of Database
 
-version = '0.2.0 Beta' # Bot's version
+version = '<VERSION>'  # Bot's version
 
-admin_ids = [] # Telegram ids
+admin_ids = []  # Telegram ids

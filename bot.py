@@ -1,18 +1,19 @@
 #!/root/tg_cipher_bot/venv/bin/python
 # -*- coding: utf-8 -*-
 import telebot
+from functools import wraps
 
 # For Webhook
 from aiohttp import web
 import ssl
 
 # Мои файлы
-from config import *
-from webhook import *
-from func import *
-from m3crypto import *
-from markups import *
-from utils import *
+import config
+import webhook
+import func
+import markups
+import utils
+import static_data
 
 # Потоки и время для резервного копирования
 from threading import Thread
@@ -22,7 +23,7 @@ import time
 import logging
 
 logging.basicConfig(format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s',
-                    level=logging.INFO, filename=directory + 'cipher.log')
+                    level=logging.INFO, filename=config.DIRECTORY + 'cipher.log')
 
 # Хранилище данных о сессиях
 sessionStorage = {}
@@ -45,8 +46,11 @@ async def handle(request):
 
 app.router.add_post('/{token}/', handle)
 
+
 # WEBHOOK_END
 
+
+# DATA_BACKUP_BEGIN
 
 def unic_decode(cards):
     for i in range(len(cards)):
@@ -84,7 +88,7 @@ def users_recovery(users_data):
 
 
 def data_recovery():
-    FILE = open(directory + DATA_BACKUP_FILE, "r")
+    FILE = open(config.DIRECTORY + config.DATA_BACKUP_FILE, "r")
     users_data = eval(FILE.read())
     users_recovery(users_data)
 
@@ -97,19 +101,19 @@ def data_backup():
         # users_data += data[user_id].get_backup_data()
         users_data += [user_id, unic_encode(data[user_id]['cards'])]
 
-    FILE = open(directory + DATA_BACKUP_FILE, "w")
+    FILE = open(config.DIRECTORY + config.DATA_BACKUP_FILE, "w")
     FILE.write(str(users_data))
     FILE.close()
-    time.sleep(DATA_BACKUP_TIME)
+    time.sleep(static_data.DATA_BACKUP_TIME)
 
 
 # Запуск бота
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(config.TOKEN)
 
 try:
     data_recovery()
     logging.info('Data recovery: Success!')
-    print('Data recovery:  Success!')
+    print('Data recovery: Success!')
 except Exception as e:
     logging.info('Data recovery: Error\n' + str(e))
     print('Data recovery: Error\n' + str(e))
@@ -117,774 +121,517 @@ except Exception as e:
 logging.info('Server started')
 print('Server started')
 
-try:
-    bot.send_message(admin_ids[0], 'Бот запущен')
-except Exception:
-    pass
-
-
-@bot.message_handler(commands=['admin'])
-def admin(message):
-    mid = message.chat.id
-    if mid not in admin_ids:
-        return
-
-    bot.send_message(mid, """
-/getdata - Данные пользователя
-/null - обнуление шага
-""")
-
-
-@bot.message_handler(commands=['getdata'])
-def getdata(message):
-    mid = message.chat.id
-    if mid not in admin_ids:
-        return
-
-    bot.send_message(mid, str(sessionStorage[mid]))
-
-
-@bot.message_handler(commands=['null'])
-def null(message):
-    mid = message.chat.id
-    if mid not in admin_ids:
-        return
-
-    bot.send_message(mid, 'Ваш шаг был: ' + sessionStorage[mid]['step'])
-    sessionStorage[mid]['step'] = 'main'
-    bot.send_message(mid, str(sessionStorage[mid]))
-
-
-# Приветствие
-# Вход: Сообщение
-# Выход: -
-@bot.message_handler(commands=['start'])
-def start(message):
-    mid = message.chat.id
-
-    if sessionStorage.get(mid) == None:
-        logging.info('start [%s]: Creating sessionStorage file', str(mid))
-        sessionStorage[mid] = {
-            'step': 'main',
-            'cards': TEST_DATA,
-            'watchcard': -1,
-            'code': ''
-        }
-
-    step = sessionStorage[mid]['step']
-
-    # bot.send_message(mid, '1234567812345678, 12/2025, 361, 9430\n\n' + str(sessionStorage[mid]))
-
-    text = """
-Привет, данный бот поможет тебе хранить данные твоих банковских карт абсолютно безопасно!
-Для примера мы оставили тут карту "тест 1234" с защитным кодом 1234, попробуй посмотреть ее данные.
-Пожалуйста, не забывайте защитный код, потому что он не хранится в системе и восстановить его будет невозможно!
-Шифрование реализованно алгоритмом AES-128.
-Вот в таком виде хранится информация по катре "тест 1234":
-{
-    'name':'Тест 1234',
-    'num':'1234567812345678',
-    'date':b'\x8c\x81\x99n#_$Z\xe0x\x82\x19\x02\xd3W\xdc',
-    'cvc':b'\xf68|$\xf5g/u\xbf\xde\xa7\x05mN\x85\xd9',
-    'pin':b'\x8a\xa6[\\M\xb3"\x04\xe9\xdbVY\xd1\xe2?\xde'
-}
-"""
-
-    try:
-        bot.send_message(mid, text, reply_markup=MUP[step])
-    except Exception:
-        bot.send_message(mid, text)
-
+if len(config.admin_ids) > 0:
+    bot.send_message(config.admin_ids[0], 'Бот запущен')
 
 Backup_Thread = Thread()
 
 
-# Главная функция, обработка всего приходящего текста
-# Вход: Сообщение
-# Выход: -
-@bot.message_handler(content_types=['text'])
-def main(message):
-    global Backup_Thread
-    mid = message.chat.id
-    text = message.text.lower()
-
-    if sessionStorage.get(mid) == None:
-        sessionStorage[mid] = {
-            'step': 'main',
-            'cards': TEST_DATA,
-            'watchcard': -1,
-            'code': '',
-            'addcard': None
-        }
-
-    if not Backup_Thread.is_alive():
-        Backup_Thread = Thread(target=data_backup)
-        Backup_Thread.start()
-
-    step = sessionStorage[mid]['step']
-
-    if sessionStorage[mid].get('inline') != None:
-        bot.edit_message_text(chat_id=mid,
-                              message_id=sessionStorage[mid].get('inline'),
-                              text="Данное сообщение уже устарело")
-        sessionStorage[mid].pop('inline')
-        return
-
-    if step == 'main':
-
-        sessionStorage[mid]['code'] = ''
-        sessionStorage[mid]['watchcard'] = -1
-        sessionStorage[mid]['addcard'] = None
-
-        if text == '**мои карты**':
-
-            logging.info('main [%s]: Watch Cards', str(mid))
-            if len(sessionStorage[mid]['cards']) == 0:
-                logging.info('main [%s]: No Cards', str(mid))
-                bot.send_message(mid, 'У вас нет карт', reply_markup=MUP[step])
-                return
-            logging.info('main [%s]: Getting cards', str(mid))
-            keybGR = get_cards(mid, 'watchcard')
-            keybGR.add(cancbut)
-            logging.info('main [%s]: Got', str(mid))
-
-            sent = bot.send_message(mid, 'Выберите карту (всего карт ' + str(len(sessionStorage[mid]['cards'])) + ')',
-                                    reply_markup=keybGR)
-            sessionStorage[mid]['inline'] = sent.message_id
-
-        elif text == '**добавить карту**':
-
-            logging.info('main [%s]: Add Card', str(mid))
-            sessionStorage[mid]['step'] += '_addcard'
-            sent = bot.send_message(mid, 'Введите имя карты', reply_markup=cancpad)
-            sessionStorage[mid]['inline'] = sent.message_id
-            bot.register_next_step_handler(sent, card_add1)
-
-        elif text == '**удалить карту**':
-
-            logging.info('main [%s]: Delete Cards', str(mid))
-            if len(sessionStorage[mid]['cards']) == 0:
-                logging.info('main [%s]: No Cards', str(mid))
-                bot.send_message(mid, 'У вас нет карт', reply_markup=MUP[step])
-                return
-
-            logging.info('main [%s]: Getting cards', str(mid))
-            keybGR = get_cards(mid, 'delete')
-            keybGR.add(cancbut)
-            logging.info('main [%s]: Got', str(mid))
-
-            sent = bot.send_message(mid, 'Выберите карту, которую хотите удалить', reply_markup=keybGR)
-            sessionStorage[mid]['inline'] = sent.message_id
+# DATA_BACKUP_END
 
 
-def get_cards(mid, data=None, tp=0, text=''):
-    if tp == 0 or tp == 2:
-        keybGR = types.InlineKeyboardMarkup()
-    elif tp == 1:
-        cards = []
+# sessionStorage decorator
+def ss_dec(function_to_decorate):
+    @wraps(function_to_decorate)
+    def wrapped(message):
+        chat_id = message.chat.id
+        if chat_id not in sessionStorage:
+            sessionStorage[chat_id] = utils.UserData()
+        elif sessionStorage[chat_id].getInline() is not None:
+            bot.edit_message_text(chat_id=chat_id,
+                                  message_id=sessionStorage[chat_id].getInline(),
+                                  text="Данное сообщение уже устарело")
+            sessionStorage[chat_id].resetAll()
+        return function_to_decorate(message)
 
-    if mid not in sessionStorage:
-        logging.info('main [%s]: No ID', str(mid))
-        return []
-
-    for i, elem in enumerate(sessionStorage[mid]['cards']):
-        if tp == 0:
-            keybGR.add(types.InlineKeyboardButton(text=elem['name'], callback_data=data + '_' + str(i)))
-        elif tp == 1:
-            cards.append(elem['name'])
-        elif tp == 2:
-            if text in elem['name']:
-                keybGR.add(types.InlineKeyboardButton(text=elem['name'], callback_data=data + '_' + str(i)))
-
-    if tp == 0 or tp == 2:
-        return keybGR
-    elif tp == 1:
-        return cards
+    return wrapped
 
 
-def check_num(num):
-    sm = 0
-    l = int(num[-1])
-    for i in range(1, len(num)):
-        p = int(num[-i - 1])
-        if i % 2 != 0:
-            p *= 2
-        if p > 9:
-            p -= 9
-        sm += p
-    sm = 10 - (sm % 10)
-    sm %= 10
-    print(sm, l)
-    if l != sm:
+def isAdmin_dec(function_to_decorate):
+    @wraps(function_to_decorate)
+    def wrapped(message):
+        chat_id = message.chat.id
+        if not sessionStorage[chat_id].isAdmin():
+            return
+        return function_to_decorate(message)
+
+    return wrapped
+
+
+@ss_dec
+def backup_dec(function_to_decorate):
+    @wraps(function_to_decorate)
+    def wrapped(message):
+        global Backup_Thread
+        if not Backup_Thread.is_alive():
+            Backup_Thread = Thread(target=data_backup)
+            Backup_Thread.start()
+        return function_to_decorate(message)
+
+    return wrapped
+
+
+@backup_dec
+def checkCards_dec(function_to_decorate):
+    @wraps(function_to_decorate)
+    def wrapped(message):
+        chat_id = message.chat.id
+        user = sessionStorage[chat_id]
+        step = user.getStep()
+        if len(user.cards) == 0:
+            logging.info(f'main {chat_id}: No Cards')
+            bot.send_message(chat_id, 'У вас нет карт', reply_markup=markups.MUP[step])
+            return
+        return function_to_decorate(message)
+
+    return wrapped
+
+
+def noInline_dec(function_to_decorate):
+    @wraps(function_to_decorate)
+    def wrapped(message):
+        chat_id = message.chat.id
+        sessionStorage[chat_id].resetInline()
+        return function_to_decorate(message)
+
+    return wrapped
+
+
+def checkInline_dec(function_to_decorate):
+    @wraps(function_to_decorate)
+    def wrapped(call):
+        chat_id = call.message.chat.id
+        message_id = call.message.message_id
+        user = sessionStorage[chat_id]
+        bot.edit_message_text(chat_id=chat_id,
+                              message_id=message_id,
+                              text='Загрузка...\n' + call.message.text,
+                              parse_mode='Markdown')
+        if user.getInline() is None or user.getInline() != message_id:
+            bot.edit_message_text(chat_id=chat_id, message_id=message_id, text="Данное сообщение уже устарело")
+            return
+        user.resetInline()
+        return function_to_decorate(call)
+
+    return wrapped
+
+
+@backup_dec
+def check_step(message, step, text=None):
+    chat_id = message.chat.id
+    cur_step = sessionStorage[chat_id].getStep()
+    if text is None:
+        return cur_step == step
+    return cur_step == step and message.text.lower() == text.lower()
+
+
+def check_call_step(call, data, step=None):
+    if not call.message:
         return False
-    return True
+    cur_data = call.data
+    if step is None:
+        return cur_data.startswith(data)
+    chat_id = call.message.chat.id
+    cur_step = sessionStorage[chat_id].getStep()
+    return cur_step.startswith(step) and cur_data.startswith(data)
 
 
-# Name
-def card_add1(message):
-    mid = message.chat.id
+@bot.message_handler(commands=['admin'])
+@ss_dec
+@isAdmin_dec
+def handle_admin(message):
+    chat_id = message.chat.id
+    bot.send_message(chat_id, func.get_commands(static_data.ADMIN_COMMANDS))
+
+
+@bot.message_handler(commands=['getdata'])
+@ss_dec
+@isAdmin_dec
+def getdata(message):
+    chat_id = message.chat.id
+    bot.send_message(chat_id, str(sessionStorage[chat_id]))
+
+
+@bot.message_handler(commands=['getbackup'])
+@ss_dec
+@isAdmin_dec
+def getbackup(message):
+    chat_id = message.chat.id
+    data = open(config.DIRECTORY + config.DATA_BACKUP_FILE, 'rb')
+    bot.send_document(chat_id, data)
+
+
+@bot.message_handler(commands=['null'])
+@ss_dec
+@isAdmin_dec
+def null(message):
+    chat_id = message.chat.id
+    bot.send_message(chat_id, 'Ваш шаг был: ' + sessionStorage[chat_id].getStep())
+    sessionStorage[chat_id].resetAll()
+
+
+@bot.message_handler(commands=['start'])
+@backup_dec
+@noInline_dec
+def handle_start(message):
+    chat_id = message.chat.id
+    step = sessionStorage[chat_id].getStep()
+    if step in markups.MUP:
+        bot.send_message(chat_id, static_data.START_TEXT, reply_markup=markups.MUP[step])
+    else:
+        bot.send_message(chat_id, static_data.START_TEXT)
+
+
+@bot.message_handler(func=lambda message: check_step(message, 'main', '**мои карты**'), content_types=['text'])
+@backup_dec
+@noInline_dec
+@checkCards_dec
+def handle_step_main_watch(message):
+    chat_id = message.chat.id
+    user = sessionStorage[chat_id]
+
+    logging.info(f'main {chat_id}: Watch Cards')
+    logging.info(f'main {chat_id}: Getting cards')
+    keybGR = user.get_cards_keyboard(chat_id, data='watchcard')
+    logging.info(f'main {chat_id}: Got')
+    sent = bot.send_message(chat_id, 'Выберите карту (всего карт ' + str(len(user.cards)) + ')',
+                            reply_markup=keybGR)
+    user.setInline(sent.message_id)
+
+
+@bot.message_handler(func=lambda message: check_step(message, 'main', '**добавить карту**'), content_types=['text'])
+@backup_dec
+@noInline_dec
+def handle_step_main_add(message):
+    chat_id = message.chat.id
+    user = sessionStorage[chat_id]
+
+    logging.info(f'main {chat_id}: Add Card')
+    user.nextStep('addcard_name')
+    sent = bot.send_message(chat_id, 'Введите имя карты', reply_markup=markups.canc_pad)
+    sessionStorage[chat_id].setInline(sent.message_id)
+
+
+@bot.message_handler(func=lambda message: check_step(message, 'main', '**удалить карту**'), content_types=['text'])
+@backup_dec
+@noInline_dec
+@checkCards_dec
+def handle_step_main_del(message):
+    chat_id = message.chat.id
+    user = sessionStorage[chat_id]
+
+    logging.info(f'main {chat_id}: Delete Cards')
+
+    logging.info(f'main {chat_id}: Getting cards')
+    keybGR = user.get_cards_keyboard(chat_id, data='delete')
+    logging.info(f'main {chat_id}: Got')
+
+    sent = bot.send_message(chat_id, 'Выберите карту, которую хотите удалить', reply_markup=keybGR)
+    sessionStorage[chat_id].setInline(sent.message_id)
+
+
+@bot.message_handler(func=lambda message: check_step(message, 'main_addcard_'), content_types=['text'])
+@backup_dec
+@noInline_dec
+def handle_step_main_addcard(message):
+    chat_id = message.chat.id
     text = message.text.lower()
-    if sessionStorage[mid]['step'] != 'main_addcard':
-        logging.info('card_add1 [%s]: Another step (%s)', str(mid), sessionStorage[mid]['step'])
-        return
-    sessionStorage[mid]['inline'] = None
+    user = sessionStorage[chat_id]
+    step = user.getStep()
+    subj = step.split('_')[-1]
 
-    logging.info('card_add1 [%s]: Getting cards', str(mid))
-    cards = get_cards(mid, tp=1)
-    logging.info('card_add1 [%s]: Got', str(mid))
+    if subj == 'name':
+        user.addCard = utils.Card()
 
-    if text in cards:
-        logging.info('card_add1 [%s]: Name already exists', str(mid))
-        sent = bot.send_message(mid, 'Карта с таким именем  уже существует.\nПожалуйста, введите другое имя',
-                                reply_markup=cancpad)
-        sessionStorage[mid]['inline'] = sent.message_id
-        bot.register_next_step_handler(sent, card_add1)
-        return
+    info, added = user.setSubj(subj, text)
+    log_info = static_data.MESSAGES[step][info]['forLog']
+    user_info = static_data.MESSAGES[step][info]['forUser']
+    logging.info(f"{step} {chat_id}: {log_info}")
 
-    if len(text) > 32:
-        logging.info('card_add1 [%s]: Name is too long', str(mid))
-        sent = bot.send_message(mid, 'Слишком длинное название (не более 32 символов)\nПожалуйста, введите другое имя',
-                                reply_markup=cancpad)
-        sessionStorage[mid]['inline'] = sent.message_id
-        bot.register_next_step_handler(sent, card_add1)
+    if not added:
+        sent = bot.send_message(chat_id, user_info, reply_markup=markups.canc_pad)
+        user.setInline(sent.message_id)
         return
 
-    if check_text(text, 'ruseng1'):
-        logging.info('card_add1 [%s]: Wrong format', str(mid))
-        sent = bot.send_message(mid, 'Используйте русские, английские буквы и цифры\nПожалуйста, введите другое имя',
-                                reply_markup=cancpad)
-        sessionStorage[mid]['inline'] = sent.message_id
-        bot.register_next_step_handler(sent, card_add1)
+    user.prevStep()
+    user.nextStep(user.addCard.order[subj])
+    sent = bot.send_message(chat_id, user_info, reply_markup=markups.pin_pad)
+    user.setInline(sent.message_id)
+
+
+@bot.inline_handler(lambda query: len(query.query) >= 0)
+@backup_dec
+def query_text(query):
+    chat_id = query.from_user.id
+    name = query.query
+    user = sessionStorage[chat_id]
+
+    if len(user.cards) == 0:
         return
 
-    logging.info('card_add1 [%s]: Creating addcard', str(mid))
-    sessionStorage[mid]['addcard'] = {
-        'name': text,
-        'num': '',
-        'date': '',
-        'cvc': '',
-        'pin': ''
-    }
-
-    sessionStorage[mid]['step'] += '_code'
-    sent = bot.send_message(mid, '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nПридумайте защитный код (до 16 символов)\n----',
-                            reply_markup=pin_pad)
-    sessionStorage[mid]['inline'] = sent.message_id
+    results = user.getQueryKeyboard(name)
+    bot.answer_inline_query(query.id, results)
 
 
-# Num
-def card_add2(message):
-    mid = message.chat.id
-    text = message.text.lower()
-    if sessionStorage[mid]['step'] != 'main_addcard_num':
-        logging.info('card_add2 [%s]: Another step (%s)', str(mid), sessionStorage[mid]['step'])
-        return
-    sessionStorage[mid]['inline'] = None
-
-    if not text.isdigit():
-        logging.info('card_add2 [%s]: Not digits', str(mid))
-        sent = bot.send_message(mid, 'Пожалуйста, используйте только цифры\nПожалуйста, введите номер карты заново',
-                                reply_markup=cancpad)
-        sessionStorage[mid]['inline'] = sent.message_id
-        bot.register_next_step_handler(sent, card_add2)
-        return
-
-    if len(text) != 16:
-        logging.info('card_add2 [%s]: Not enough simbols', str(mid))
-        sent = bot.send_message(mid, 'Длина номера должна быть 16 символов\nПожалуйста, введите номер карты заново',
-                                reply_markup=cancpad)
-        sessionStorage[mid]['inline'] = sent.message_id
-        bot.register_next_step_handler(sent, card_add2)
-        return
-
-    if not check_num(text):
-        logging.info('card_add2 [%s]: Not num', str(mid))
-        sent = bot.send_message(mid, 'Номер неверен.\nПожалуйста, введите номер карты заново', reply_markup=cancpad)
-        sessionStorage[mid]['inline'] = sent.message_id
-        bot.register_next_step_handler(sent, card_add2)
-        return
-
-    sessionStorage[mid]['addcard']['num'] = text
-
-    sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-    sessionStorage[mid]['step'] += '_date'
-    step = sessionStorage[mid]['step']
-    sent = bot.send_message(mid, '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите дату окончания срока действия карты\n--/----',
-                            reply_markup=pin_pad)
-    sessionStorage[mid]['inline'] = sent.message_id
-
-
-def watch_card(call):
-    mid = call.message.chat.id
-    step = sessionStorage[mid]['step']
-
-    i = sessionStorage[mid]['watchcard']
-    code = sessionStorage[mid]['code']
-    name = sessionStorage[mid]['cards'][i]['name']
-
-    num = sessionStorage[mid]['cards'][i]['num']
-    date = sessionStorage[mid]['cards'][i]['date']
-    cvc = sessionStorage[mid]['cards'][i]['cvc']
-    pin = sessionStorage[mid]['cards'][i]['pin']
-
-    try:
-        # num = decrypt(code, num)
-        date = decrypt(code, date)
-        cvc = decrypt(code, cvc)
-        pin = decrypt(code, pin)
-    except Exception:
-        logging.info('pin_acc  [%s]: Decrypt error', str(mid))
-        sessionStorage[mid]['code'] = ''
-        sessionStorage[mid]['watchcard'] = -1
-        sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-        step = sessionStorage[mid]['step']
-        bot.edit_message_text(chat_id=mid,
-                              message_id=call.message.message_id,
-                              text='Произошла ошибка при декодировании.\nВозможно, защитный код введен неправильно. Попробуйте еще раз',
-                              parse_mode='Markdown')
-        return
-    logging.info('pin_acc  [%s]: Decrypted', str(mid))
-
-    if (not num.isdigit()) or (not date.isdigit()) or (not cvc.isdigit()) or (not pin.isdigit()):
-        logging.info('pin_acc  [%s]: Not digit', str(mid))
-        sessionStorage[mid]['code'] = ''
-        sessionStorage[mid]['watchcard'] = -1
-        sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-        step = sessionStorage[mid]['step']
-        bot.edit_message_text(chat_id=mid,
-                              message_id=call.message.message_id,
-                              text='Произошла ошибка.\nВозможно, защитный код введен неправильно. Попробуйте еще раз',
-                              parse_mode='Markdown')
-        return
-
-    sessionStorage[mid]['code'] = ''
-    sessionStorage[mid]['watchcard'] = -1
-    sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-    step = sessionStorage[mid]['step']
-    keybGR = types.InlineKeyboardMarkup()
-
-    bot.edit_message_text(chat_id=mid,
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'cancel'))
+@checkInline_dec
+def handle_inline_cancel(call):
+    chat_id = call.message.chat.id
+    user = sessionStorage[chat_id]
+    logging.info('cancel {chat_id}: Cancel')
+    user.resetAll()
+    bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
-                          text='''
-Защитный код принят. Данное сообщение исчезнет через 5 секунд.
-Карта: *''' + name + '''*
-Номер карты: `''' + num + '''`
-Дата: ''' + date[:2] + '/' + date[2:] + '''
-CVC-код: ''' + cvc + '''
-PIN-код: _''' + pin + '_',
-                          parse_mode='Markdown',
-                          reply_markup=keybGR)
-
-    logging.info('pin_acc  [%s]: Waiting 10 sec...', str(mid))
-    time.sleep(5)
-    logging.info('pin_acc  [%s]: Done', str(mid))
-
-    bot.edit_message_text(chat_id=mid,
-                          message_id=call.message.message_id,
-                          text='''
-Сообщение устарело.
-Карта: *''' + name + '''*
-Номер карты: `''' + num + '`',
+                          text='_Действие отменено_\n' + call.message.text,
                           parse_mode='Markdown')
 
 
-# Инлайн-режим с непустым запросом
-@bot.inline_handler(lambda query: len(query.query) >= 0)
-def query_text(query):
-    try:
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'deletecard_'))
+@checkInline_dec
+def handle_inline_deletecard(call):
+    chat_id = call.message.chat.id
+    user = sessionStorage[chat_id]
+    name = user.getWatchCardName()
+    text = 'Выбрана карта *' + name + '*\n'
+    if call.data.endwith('yes'):
+        user.deleteWatchCard()
+        text += 'Карта удалена'
+    else:
+        text += 'Удаление отменено'
 
-        uid = query.from_user.id
-        text = query.query
-
-        cards = get_cards(uid, tp=1)
-        if not cards or len(cards) == 0:
-            return
-
-        results = []
-
-        # Клавиатура
-        kb = types.InlineKeyboardMarkup()
-        kb.add(types.InlineKeyboardButton(text="Нажми меня", callback_data="test"))
-
-        for i, elem in enumerate(cards):
-            if text in elem:
-                single_msg = types.InlineQueryResultArticle(
-                    id=str(i), title=elem,
-                    input_message_content=types.InputTextMessageContent(
-                        message_text='Карта *' + elem + '*\nНомер: `' + str(
-                            sessionStorage[uid]['cards'][i]['num']) + '`', parse_mode='Markdown'),
-                    reply_markup=None
-                )
-                results.append(single_msg)
-
-        bot.answer_inline_query(query.id, results)
-
-    except Exception as e:
-        print(str(e))
+    user.resetAll()
+    bot.edit_message_text(chat_id=chat_id,
+                          message_id=call.message.message_id,
+                          text=text,
+                          parse_mode='Markdown')
 
 
-@bot.callback_query_handler(func=lambda call: True)
-def callback_inline(call):
-    # Если сообщение из чата с ботом
-    if call.message:
-        mid = call.message.chat.id
-        step = sessionStorage[mid]['step']
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'delete_'))
+@checkInline_dec
+def handle_inline_delete(call):
+    chat_id = call.message.chat.id
+    user = sessionStorage[chat_id]
+    step = user.nextStep('delete')
 
-        bot.edit_message_text(chat_id=mid,
+    num = int((call.data.split('_')).pop())
+    name = user.setWatchCard(num)
+
+    user_info = static_data.MESSAGES[step]['confirmDelete']['forUser'](name)
+
+    bot.edit_message_text(chat_id=chat_id,
+                          message_id=call.message.message_id,
+                          text=user_info,
+                          parse_mode='Markdown',
+                          reply_markup=markups.MUP[step])
+    user.setInline(call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'watchcard_'))
+@checkInline_dec
+def handle_inline_watchcard(call):
+    chat_id = call.message.chat.id
+    user = sessionStorage[chat_id]
+    step = user.nextStep('watchcard')
+
+    num = int((call.data.split('_')).pop())
+    name = user.setWatchCard(num)
+    user.resetCode()
+
+    user_info = static_data.MESSAGES[step]['confirmDelete']['forUser'](name)
+
+    bot.edit_message_text(chat_id=chat_id,
+                          message_id=call.message.message_id,
+                          text=user_info,
+                          parse_mode='Markdown',
+                          reply_markup=markups.pin_pad)
+    user.setInline(call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'pin_can'))
+@checkInline_dec
+def handle_inline_pin_can(call):
+    chat_id = call.message.chat.id
+    user = sessionStorage[chat_id]
+    logging.info(f'{user.getStep()}  {chat_id}: Cancel')
+    user.resetAll()
+    bot.edit_message_text(chat_id=chat_id,
+                          message_id=call.message.message_id,
+                          text='_Действие отменено_\n' + call.message.text,
+                          parse_mode='Markdown')
+
+
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'pin_res'))
+@checkInline_dec
+def handle_inline_pin_res(call):
+    chat_id = call.message.chat.id
+    user = sessionStorage[chat_id]
+    step = user.getStep()
+    logging.info(f'{step}  {chat_id}: Reset pin pad')
+    text = call.message.text
+
+    if step == 'main_addcard_date':
+        user.addCard.resetDate()
+        text = text.split('\n')
+        text[-1] = '--/----'
+        text = '\n'.join(text)
+    else:
+        text = text.replace('-', '#')
+        text = text.replace('#', '')
+        text += '----'
+        if step == 'main_watchcard' or step == 'main_addcard_code':
+            user.resetCode()
+        elif step == 'main_addcard_pin':
+            user.addCard.resetPin()
+        elif step == 'main_addcard_cvc':
+            user.addCard.resetCvc()
+            text.pop()
+    bot.edit_message_text(chat_id=chat_id,
+                          message_id=call.message.message_id,
+                          text=text,
+                          parse_mode='Markdown',
+                          reply_markup=markups.pin_pad)
+    user.setInline(call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'pin_acc', 'main_watchcard'))
+@checkInline_dec
+def handle_inline_pin_acc_watchcard(call):
+    chat_id = call.message.chat.id
+    user = sessionStorage[chat_id]
+    step = user.getStep()
+
+    logging.info(f'{step} {chat_id}: Decrypting')
+
+    name = user.getWatchCardName()
+    num = user.getWatchCardNum()
+    card_text = 'Карта: *' + name + '*\n' + 'Номер карты: `' + num + '`\n'
+
+    info, decoded, text = user.decodeWatchCard()
+    log_info = static_data.MESSAGES[step][info]['forLog']
+    logging.info(f"{step} {chat_id}: {log_info}")
+    user.resetAll()
+
+    if decoded:
+        text = 'Защитный код принят. Данное сообщение исчезнет через 5 секунд.\n' + card_text + text
+    else:
+        text = static_data.MESSAGES[step][info]['forUser']
+
+    bot.edit_message_text(chat_id=chat_id,
+                          message_id=call.message.message_id,
+                          text=text,
+                          parse_mode='Markdown')
+
+    if not decoded:
+        return
+
+    logging.info(f'{step}  {chat_id}: Waiting 5 sec...')
+    time.sleep(5)
+
+    bot.edit_message_text(chat_id=chat_id,
+                          message_id=call.message.message_id,
+                          text='Сообщение устарело.' + card_text,
+                          parse_mode='Markdown')
+    logging.info(f'{step}  {chat_id}: Done')
+
+
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'pin_acc', 'main_addcard_'))
+@checkInline_dec
+def handle_inline_pin_acc_addcard(call):
+    chat_id = call.message.chat.id
+    user = sessionStorage[chat_id]
+    step = user.getStep()
+    subj = step.split('_')[-1]
+
+    logging.info(f'{step}  {chat_id}: Checking {subj}')
+
+    info, added = user.setSubj(subj)
+    log_info = static_data.MESSAGES[step][info]['forLog']
+    user_info = static_data.MESSAGES[step][info]['forUser']
+    logging.info(f"{step} {chat_id}: {log_info}")
+
+    if info == 'encode':
+        user.resetAll()
+        bot.edit_message_text(chat_id=chat_id,
                               message_id=call.message.message_id,
-                              text='Загрузка...\n' + call.message.text,
+                              text=user_info,
+                              parse_mode='Markdown')
+        return
+
+    if not added:
+        user.resetSubj()
+        bot.edit_message_text(chat_id=chat_id,
+                              message_id=call.message.message_id,
+                              text=user_info + call.message.text,
                               parse_mode='Markdown',
-                              reply_markup=types.InlineKeyboardMarkup())
+                              reply_markup=markups.pin_pad)
+        user.setInline(call.message.message_id)
+        return
 
-        if sessionStorage[mid].get('inline') == None or sessionStorage[mid]['inline'] != call.message.message_id:
-            bot.edit_message_text(chat_id=mid, message_id=call.message.message_id, text="Данное сообщение уже устарело")
-            return
+    if subj == 'pin':
+        user.cards.append(user.addCard)
+        name = user.getWatchCardName()
+        bot.edit_message_text(chat_id=chat_id,
+                              message_id=call.message.message_id,
+                              text='Карта *' + name + '* успешно добавлена!',
+                              parse_mode='Markdown')
+        return
 
-        sessionStorage[mid].pop('inline')
+    replyMarkup = markups.pin_pad
+    if subj == 'code':
+        replyMarkup = markups.canc_pad
 
-        if call.data == 'cancel':
-            logging.info('cancel [%s]: Cancel', str(mid))
-            sessionStorage[mid]['step'] = 'main'
-            sessionStorage[mid]['code'] = ''
-            sessionStorage[mid]['watchcard'] = -1
-            sessionStorage[mid]['addcard'] = None
-            bot.edit_message_text(chat_id=mid,
-                                  message_id=call.message.message_id,
-                                  text='_Действие отменено_\n' + call.message.text,
-                                  parse_mode='Markdown')
-
-        elif call.data == 'deletecard_yes':
-            logging.info('deletecard_yes [%s]: Deleting card', str(mid))
-            name = sessionStorage[mid]['cards'][sessionStorage[mid]['watchcard']]['name']
-            logging.info('deletecard_yes  [%s]: Got name', str(mid))
-            num = sessionStorage[mid]['watchcard']
-            logging.info('deletecard_yes  [%s]: Got num', str(mid))
-            sessionStorage[mid]['cards'].pop(num)
-            logging.info('deletecard_yes  [%s]: Deleted', str(mid))
-            sessionStorage[mid]['watchcard'] = -1
-            sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-            step = sessionStorage[mid]['step']
-            bot.edit_message_text(chat_id=mid,
-                                  message_id=call.message.message_id,
-                                  text='Выбрана карта *' + name + '*\nКарта удалена',
-                                  parse_mode='Markdown')
-
-        elif call.data == 'deletecard_no':
-            name = sessionStorage[mid]['cards'][sessionStorage[mid]['watchcard']]['name']
-            logging.info('deletecard_no  [%s]: Got name', str(mid))
-            sessionStorage[mid]['watchcard'] = -1
-            sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-            step = sessionStorage[mid]['step']
-            bot.edit_message_text(chat_id=mid,
-                                  message_id=call.message.message_id,
-                                  text='Выбрана карта *' + name + '*\nУдаление отменено',
-                                  parse_mode='Markdown')
-
-        elif 'delete_' in call.data:
-            sessionStorage[mid]['step'] += '_delete'
-            num = int(((call.data).split('_')).pop())
-            logging.info('delete_  [%s]: Got num', str(mid))
-            sessionStorage[mid]['watchcard'] = num
-            name = sessionStorage[mid]['cards'][sessionStorage[mid]['watchcard']]['name']
-            logging.info('delete_  [%s]: Got name', str(mid))
-            keybGR = types.InlineKeyboardMarkup()
-            cbtn1 = types.InlineKeyboardButton(text='Удалить', callback_data='deletecard_yes')
-            cbtn2 = types.InlineKeyboardButton(text='Отмена', callback_data='deletecard_no')
-            keybGR.add(cbtn1, cbtn2)
-            bot.edit_message_text(chat_id=mid,
-                                  message_id=call.message.message_id,
-                                  text='Выбрана карта *' + name + '*\nВы уверены, что хотите удалить ее из базы? Отмена невозможна!',
-                                  parse_mode='Markdown',
-                                  reply_markup=keybGR)
-            sessionStorage[mid]['inline'] = call.message.message_id
-
-        elif 'watchcard_' in call.data:
-            sessionStorage[mid]['step'] += '_watchcard'
-            logging.info('watchcard_  [%s]: Watching card', str(mid))
-            num = int(((call.data).split('_')).pop())
-            sessionStorage[mid]['watchcard'] = num
-            logging.info('watchcard_  [%s]: Got num', str(mid))
-            name = sessionStorage[mid]['cards'][sessionStorage[mid]['watchcard']]['name']
-            logging.info('watchcard_  [%s]: Got name', str(mid))
-
-            sessionStorage[mid]['code'] = ''
-
-            bot.edit_message_text(chat_id=mid,
-                                  message_id=call.message.message_id,
-                                  text='$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВыбрана карта *' + name + '*\nВведите защитный код:\n----',
-                                  parse_mode='Markdown',
-                                  reply_markup=pin_pad)
-            sessionStorage[mid]['inline'] = call.message.message_id
-
-        elif call.data == 'pin_can':
-            logging.info('pin_can  [%s]: Cancelling', str(mid))
-            sessionStorage[mid]['code'] = ''
-            sessionStorage[mid]['watchcard'] = -1
-            sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-            if step != 'main_watchcard':
-                sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-            step = sessionStorage[mid]['step']
-            bot.edit_message_text(chat_id=mid,
-                                  message_id=call.message.message_id,
-                                  text='_Действие отменено_\n' + call.message.text,
-                                  parse_mode='Markdown')
-
-        elif call.data == 'pin_res':
-            logging.info('pin_res  [%s]: Resetting pin', str(mid))
-
-            if step == 'main_watchcard' or step == 'main_addcard_code':
-                sessionStorage[mid]['code'] = ''
-            elif step == 'main_addcard_pin':
-                sessionStorage[mid]['addcard']['pin'] = ''
-            elif step == 'main_addcard_cvc':
-                sessionStorage[mid]['addcard']['cvc'] = ''
-            elif step == 'main_addcard_date':
-                sessionStorage[mid]['addcard']['date'] = ''
-
-            ltext = call.message.text
-
-            if step == 'main_watchcard' or step == 'main_addcard_code' or step == 'main_addcard_pin' or step == 'main_addcard_cvc':
-                ltext = ltext.replace('-', '#')
-                ltext = ltext.replace('#', '')
-                if step == 'main_addcard_cvc':
-                    ltext += '---'
-                else:
-                    ltext += '----'
-                bot.edit_message_text(chat_id=mid,
-                                      message_id=call.message.message_id,
-                                      text=ltext,
-                                      parse_mode='Markdown',
-                                      reply_markup=pin_pad)
-            elif step == 'main_addcard_date':
-                ltext = ltext.split('\n')
-                ltext[-1] = '--/----'
-                ltext = '\n'.join(ltext)
-                bot.edit_message_text(chat_id=mid,
-                                      message_id=call.message.message_id,
-                                      text=ltext,
-                                      parse_mode='Markdown',
-                                      reply_markup=pin_pad)
-
-            sessionStorage[mid]['inline'] = call.message.message_id
+    user.prevStep()
+    user.nextStep(user.addCard.order[subj])
+    bot.edit_message_text(chat_id=chat_id,
+                          message_id=call.message.message_id,
+                          text=user_info,
+                          reply_markup=replyMarkup)
+    user.setInline(call.message.message_id)
 
 
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'pin_', 'main_'))
+@checkInline_dec
+def handle_inline_pin_acc_addcard(call):
+    chat_id = call.message.chat.id
+    user = sessionStorage[chat_id]
+    step = user.getStep()
+    subj = step.split('_')[-1]
 
-        elif call.data == 'pin_acc':
-            logging.info('pin_acc  [%s]: Accepting pin', str(mid))
-            code = sessionStorage[mid]['code']
-            if step == 'main_watchcard':
-                watch_card(call)
+    if step == 'main_watchcard':
+        subj = 'code'
 
-            elif step == 'main_addcard_code':
-                logging.info('pin_acc  [%s]: Checking code', str(mid))
-                if len(code) < 4 or len(code) > 16:
-                    logging.info('pin_acc  [%s]: Wrong format of code', str(mid))
-                    sessionStorage[mid]['code'] = ''
-                    bot.edit_message_text(chat_id=mid,
-                                          message_id=call.message.message_id,
-                                          text='Защитный код должен содержать от 4 до 16 символов. Попробуйте еще раз.\n' + '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nПридумайте защитный код (до 16 символов)\n----',
-                                          parse_mode='Markdown',
-                                          reply_markup=pin_pad)
-                    sessionStorage[mid]['inline'] = call.message.message_id
-                    return
-                logging.info('pin_acc  [%s]: Checked', str(mid))
+    logging.info(f'{step}  {chat_id}: Entering on pin-pad')
+    num = (call.data.split('_')).pop()
 
-                sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                sessionStorage[mid]['step'] += '_num'
-                step = sessionStorage[mid]['step']
-                bot.edit_message_text(chat_id=mid,
-                                      message_id=call.message.message_id,
-                                      text='Введите номер карты',
-                                      reply_markup=cancpad)
-                sessionStorage[mid]['inline'] = call.message.message_id
-                bot.register_next_step_handler(call.message, card_add2)
+    length, num, digitCount = user.addNumSubj(subj, num)
 
-            elif step == 'main_addcard_date':
-                if len(sessionStorage[mid]['addcard']['date']) != 6:
-                    bot.edit_message_text(chat_id=mid,
-                                          message_id=call.message.message_id,
-                                          text='Вы ввели недостаточное количество символов, введите еще.\n' + call.message.text,
-                                          parse_mode='Markdown',
-                                          reply_markup=pin_pad)
-                    sessionStorage[mid]['inline'] = call.message.message_id
-                    return
+    text = call.message.text
 
-                m = sessionStorage[mid]['addcard']['date'][:2]
-                y = sessionStorage[mid]['addcard']['date'][2:]
-                m = int(m)
-                y = int(y)
-                if m < 1 or m > 12 or y < 2018:
-                    sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                    sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                    step = sessionStorage[mid]['step']
-                    bot.edit_message_text(chat_id=mid,
-                                          message_id=call.message.message_id,
-                                          text='Введенная дата некорректна')
-                    return
+    text_for_send = []
 
-                try:
-                    sessionStorage[mid]['addcard']['date'] = encrypt(code, sessionStorage[mid]['addcard']['date'])
-                except Exception:
-                    logging.info('pin_acc  [%s]: Decrypt error', str(mid))
-                    sessionStorage[mid]['code'] = ''
-                    sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                    sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                    step = sessionStorage[mid]['step']
-                    bot.edit_message_text(chat_id=mid,
-                                          message_id=call.message.message_id,
-                                          text='Произошла ошибка при кодировании')
-                    return
+    if subj != 'date':
+        text = text.replace('-', '#')
+        text = text.replace('#', '')
 
-                sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                sessionStorage[mid]['step'] += '_cvc'
-                step = sessionStorage[mid]['step']
-                bot.edit_message_text(chat_id=mid,
-                                      message_id=call.message.message_id,
-                                      text='$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите CVC код\n---',
-                                      reply_markup=pin_pad)
-                sessionStorage[mid]['inline'] = call.message.message_id
+        text_for_send.append(text + '#' * (length - 1) + num + '-' * max(digitCount - length, 0))
+        text_for_send.append(text + '#' * length + '-' * max(digitCount - length, 0))
+    else:
+        text = text.replace('-', '')
+        if length < 3:
+            text = text.replace('/', '')
+            text_for_send.append(text + num + '-' * (max(digitCount - 4 - length, 0)) + '/----')
+        else:
+            text_for_send.append(text + num + '-' * (max(digitCount - length, 0)))
 
-            elif step == 'main_addcard_cvc':
-                if len(sessionStorage[mid]['addcard']['cvc']) < 3 or len(sessionStorage[mid]['addcard']['cvc']) > 4:
-                    sessionStorage[mid]['addcard']['cvc'] = ''
-                    bot.edit_message_text(chat_id=mid,
-                                          message_id=call.message.message_id,
-                                          text='CVC код должен содержать от 3 до 4 символов. Попробуйте еще раз\n' + '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите CVC код\n---',
-                                          parse_mode='Markdown',
-                                          reply_markup=pin_pad)
-                    sessionStorage[mid]['inline'] = call.message.message_id
-                    return
-
-                try:
-                    sessionStorage[mid]['addcard']['cvc'] = encrypt(code, sessionStorage[mid]['addcard']['cvc'])
-                except Exception:
-                    logging.info('pin_acc  [%s]: Decrypt error', str(mid))
-                    sessionStorage[mid]['code'] = ''
-                    sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                    sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                    step = sessionStorage[mid]['step']
-                    bot.edit_message_text(chat_id=mid,
-                                          message_id=call.message.message_id,
-                                          text='Произошла ошибка при кодировании')
-                    return
-
-                sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                sessionStorage[mid]['step'] += '_pin'
-                step = sessionStorage[mid]['step']
-                bot.edit_message_text(chat_id=mid,
-                                      message_id=call.message.message_id,
-                                      text='$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите PIN код\n----',
-                                      reply_markup=pin_pad)
-                sessionStorage[mid]['inline'] = call.message.message_id
-
-            elif step == 'main_addcard_pin':
-                logging.info('pin_acc  [%s]: Checking pin', str(mid))
-                if len(sessionStorage[mid]['addcard']['pin']) < 4 or len(sessionStorage[mid]['addcard']['pin']) > 8:
-                    logging.info('pin_acc  [%s]: Not enough simbols', str(mid))
-                    sessionStorage[mid]['addcard']['pin'] = ''
-                    bot.edit_message_text(chat_id=mid,
-                                          message_id=call.message.message_id,
-                                          text='PIN код должен состоять из 4 символов. Попробуйте еще раз\n' + '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите PIN код\n----',
-                                          parse_mode='Markdown',
-                                          reply_markup=pin_pad)
-                    sessionStorage[mid]['inline'] = call.message.message_id
-                    return
-
-                logging.info('pin_acc  [%s]: Checked', str(mid))
-
-                try:
-                    logging.info('pin_acc  [%s]: Trying to encrypt', str(mid))
-                    sessionStorage[mid]['addcard']['pin'] = encrypt(code, sessionStorage[mid]['addcard']['pin'])
-                    logging.info('pin_acc  [%s]: Encrypted', str(mid))
-                except Exception:
-                    logging.info('pin_acc  [%s]: Encrypt error', str(mid))
-                    sessionStorage[mid]['code'] = ''
-                    sessionStorage[mid]['addcard'] = None
-                    sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                    sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                    step = sessionStorage[mid]['step']
-                    bot.edit_message_text(chat_id=mid,
-                                          message_id=call.message.message_id,
-                                          text='Произошла ошибка при кодировании')
-                    return
-
-                logging.info('pin_acc  [%s]: Adding card', str(mid))
-                sessionStorage[mid]['cards'].append(sessionStorage[mid]['addcard'])
-                logging.info('pin_acc  [%s]: Added', str(mid))
-                name = sessionStorage[mid]['addcard']['name']
-                sessionStorage[mid]['addcard'] = None
-                sessionStorage[mid]['code'] = ''
-
-                sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                sessionStorage[mid]['step'] = prev_step(sessionStorage[mid]['step'])
-                step = sessionStorage[mid]['step']
-                bot.edit_message_text(chat_id=mid,
-                                      message_id=call.message.message_id,
-                                      text='Карта *' + name + '* успешно добавлена!',
-                                      parse_mode='Markdown')
-
-        elif 'pin_' in call.data:
-            logging.info('pin_  [%s]: Entering pin', str(mid))
-            num = ((call.data).split('_')).pop()
-
-            if step == 'main_watchcard' or step == 'main_addcard_code':
-                sessionStorage[mid]['code'] += num
-                ln = len(sessionStorage[mid]['code'])
-            elif step == 'main_addcard_pin':
-                sessionStorage[mid]['addcard']['pin'] += num
-                ln = len(sessionStorage[mid]['addcard']['pin'])
-            elif step == 'main_addcard_cvc':
-                sessionStorage[mid]['addcard']['cvc'] += num
-                ln = len(sessionStorage[mid]['addcard']['cvc'])
-            elif step == 'main_addcard_date':
-                sessionStorage[mid]['addcard']['date'] += num
-                ln = len(sessionStorage[mid]['addcard']['date'])
-                if ln > 6:
-                    sessionStorage[mid]['addcard']['date'] = sessionStorage[mid]['addcard']['date'][:6]
-                    num = ''
-
-            ltext = call.message.text
-
-            if step == 'main_watchcard' or step == 'main_addcard_code' or step == 'main_addcard_pin' or step == 'main_addcard_cvc':
-                ltext = ltext.replace('-', '#')
-                ltext = ltext.replace('#', '')
-                k = 4
-                if step == 'main_addcard_cvc':
-                    k = 3
-                bot.edit_message_text(chat_id=mid,
-                                      message_id=call.message.message_id,
-                                      text=ltext + '#' * (ln - 1) + num + '-' * (max(k - ln, 0)),
-                                      parse_mode='Markdown',
-                                      reply_markup=pin_pad)
-                time.sleep(0.01)
-                bot.edit_message_text(chat_id=mid,
-                                      message_id=call.message.message_id,
-                                      text=ltext + '#' * ln + '-' * (max(k - ln, 0)),
-                                      parse_mode='Markdown',
-                                      reply_markup=pin_pad)
-            elif step == 'main_addcard_date':
-                ltext = ltext.replace('-', '')
-                if ln < 3:
-                    ltext = ltext.replace('/', '')
-                    bot.edit_message_text(chat_id=mid,
-                                          message_id=call.message.message_id,
-                                          text=ltext + num + '-' * (max(2 - ln, 0)) + '/----',
-                                          parse_mode='Markdown',
-                                          reply_markup=pin_pad)
-                else:
-                    bot.edit_message_text(chat_id=mid,
-                                          message_id=call.message.message_id,
-                                          text=ltext + num + '-' * (max(6 - ln, 0)),
-                                          parse_mode='Markdown',
-                                          reply_markup=pin_pad)
-
-            sessionStorage[mid]['inline'] = call.message.message_id
-
-    # Если сообщение из инлайн-режима
-    elif call.inline_message_id:
-
-        if call.data == "test":
-            bot.edit_message_text(inline_message_id=call.inline_message_id, text="Бдыщь")
+    for send_text in text_for_send:
+        bot.edit_message_text(chat_id=chat_id,
+                              message_id=call.message.message_id,
+                              text=send_text,
+                              parse_mode='Markdown',
+                              reply_markup=markups.pin_pad)
+        if send_text != text_for_send[-1]:
+            time.sleep(0.01)
+    user.setInline(call.message.message_id)
 
 
 # WEBHOOK_START
@@ -893,18 +640,18 @@ def callback_inline(call):
 bot.remove_webhook()
 
 # Set webhook
-bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
-                certificate=open(WEBHOOK_SSL_CERT, 'r'))
+bot.set_webhook(url=webhook.WEBHOOK_URL_BASE + webhook.WEBHOOK_URL_PATH,
+                certificate=open(webhook.WEBHOOK_SSL_CERT, 'r'))
 
 # Build ssl context
 context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-context.load_cert_chain(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV)
+context.load_cert_chain(webhook.WEBHOOK_SSL_CERT, webhook.WEBHOOK_SSL_PRIV)
 
 # Start aiohttp server
 web.run_app(
     app,
-    host=WEBHOOK_LISTEN,
-    port=WEBHOOK_PORT,
+    host=webhook.WEBHOOK_LISTEN,
+    port=webhook.WEBHOOK_PORT,
     ssl_context=context,
 )
 
