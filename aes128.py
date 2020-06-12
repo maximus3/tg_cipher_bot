@@ -13,8 +13,8 @@ Comments rather won't help if don't read documentation of the algorithm.
 
 """
 
-nb = 4  # number of coloumn of State (for AES = 4)
-nr = 10  # number of rounds ib ciper cycle (if nb = 4 nr = 10)
+nb = 4  # number of column of State (for AES = 4)
+nr = 10  # number of rounds ib cipher cycle (if nb = 4 nr = 10)
 nk = 4  # the key length (in 32-bit words)
 
 # This dict will be used in SubBytes(). 
