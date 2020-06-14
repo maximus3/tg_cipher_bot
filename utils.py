@@ -48,7 +48,7 @@ def wrong_format_text(text, tp):
         return False
 
 
-class Card:
+class CardData:
     order = {
         'name': 'code',
         'code': 'num',
@@ -192,14 +192,18 @@ class UserData:
         'inline': None,
     }
 
-    def _init__(self, cid, data=TEST_DATA):
-        self._admin = (cid in admin_ids)
+    def _init__(self, chat_id, data=TEST_DATA):
+        if len(data) == 0:
+            data = TEST_DATA
+
+        self._admin = (chat_id in admin_ids)
+        self.chat_id = chat_id
         self._step = self._defaultValues['step']
         self._watchCardNum = self._defaultValues['watchCardNum']
         self._code = self._defaultValues['code']
         self._inline = self._defaultValues['inline']
-        self.cards = [Card(card) for card in data]
-        self.addCard = Card()
+        self.cards = [CardData(card) for card in data]
+        self.addCard = CardData()
 
     def __str__(self):
         return str({
@@ -243,7 +247,7 @@ class UserData:
         self._code = self._defaultValues['code']
         self._watchCardNum = self._defaultValues['watchCardNum']
         self._step = self._defaultValues['step']
-        self.addCard = Card()
+        self.addCard = CardData()
 
     def setAddCardName(self, name):
         for card in self.cards:

@@ -72,6 +72,10 @@ MESSAGES = {
         'ok': {
             'forUser': None,
             'forLog': 'Decode is OK'
+        },
+        'enterCode': {
+            'forUser': lambda name: '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВыбрана карта *' + name + '*\nВведите защитный '
+                                                                                               'код:\n---- '
         }
     },
     'main_addcard_code': {
@@ -130,16 +134,10 @@ MESSAGES = {
             'forLog': 'PIN is OK'
         }
     },
-    '_delete': {
+    'main_delete': {
         'confirmDelete': {
             'forUser': lambda name: 'Выбрана карта *' + name + '*\nВы уверены, что хотите удалить ее из базы? Отмена '
                                                                'невозможна! '
-        }
-    },
-    '_watchcard': {
-        'enterCode': {
-            'forUser': lambda name: '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВыбрана карта *' + name + '*\nВведите защитный '
-                                                                                               'код:\n---- '
         }
     }
 }
