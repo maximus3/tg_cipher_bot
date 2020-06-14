@@ -117,7 +117,6 @@ def isAdmin_dec(function_to_decorate):
     return wrapped
 
 
-@ss_dec
 def backup_dec(function_to_decorate):
     @wraps(function_to_decorate)
     def wrapped(message):
@@ -130,7 +129,6 @@ def backup_dec(function_to_decorate):
     return wrapped
 
 
-@backup_dec
 def checkCards_dec(function_to_decorate):
     @wraps(function_to_decorate)
     def wrapped(message):
@@ -174,6 +172,7 @@ def checkInline_dec(function_to_decorate):
     return wrapped
 
 
+@ss_dec
 @backup_dec
 def check_step(message, step, text=None):
     chat_id = message.chat.id
@@ -229,6 +228,7 @@ def null(message):
 
 
 @bot.message_handler(commands=['start'])
+@ss_dec
 @backup_dec
 @noInline_dec
 def handle_start(message):
@@ -241,6 +241,7 @@ def handle_start(message):
 
 
 @bot.message_handler(func=lambda message: check_step(message, 'main', '**мои карты**'), content_types=['text'])
+@ss_dec
 @backup_dec
 @noInline_dec
 @checkCards_dec
@@ -260,6 +261,7 @@ def handle_step_main_watch(message):
 
 
 @bot.message_handler(func=lambda message: check_step(message, 'main', '**добавить карту**'), content_types=['text'])
+@ss_dec
 @backup_dec
 @noInline_dec
 def handle_step_main_add(message):
@@ -277,6 +279,7 @@ def handle_step_main_add(message):
 
 
 @bot.message_handler(func=lambda message: check_step(message, 'main', '**удалить карту**'), content_types=['text'])
+@ss_dec
 @backup_dec
 @noInline_dec
 @checkCards_dec
