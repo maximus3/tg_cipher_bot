@@ -7,25 +7,27 @@ from functools import wraps
 from aiohttp import web
 import ssl
 
-# Мои файлы
+# My files
 import config
 import webhook
 import func
 import markups
 import utils
 import static_data
+import views
 
-# Потоки и время для резервного копирования
+# For data backup
 from threading import Thread
 import time
 
-# Логгирование
+# For logs
 import logging
 
-logging.basicConfig(format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s',
+logging.basicConfig(format=u'%(filename)s %(funcName)s [LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s] %(name)s: %('
+                           u'message)s',
                     level=logging.INFO, filename=config.DIRECTORY + 'cipher.log')
 
-# Хранилище данных о сессиях
+# Data
 sessionStorage = {}
 
 # WEBHOOK_BEGIN
@@ -46,72 +48,29 @@ async def handle(request):
 
 app.router.add_post('/{token}/', handle)
 
-
 # WEBHOOK_END
 
 
-# DATA_BACKUP_BEGIN
-
-def unic_decode(cards):
-    for i in range(len(cards)):
-        cards[i]['name'] = cards[i]['name'].decode('utf-8')
-    return cards
-
-
-def unic_encode(cards):
-    data = []
-    for i in range(len(cards)):
-        data.append({
-            'name': cards[i]['name'].encode('utf-8'),
-            'num': cards[i]['num'],
-            'date': cards[i]['date'],
-            'cvc': cards[i]['cvc'],
-            'pin': cards[i]['pin']
-        })
-    return str(data)
-
-
-def users_recovery(users_data):
-    data = {}
-    count = users_data.pop(0)
-    for i in range(count):
-        user_id = users_data.pop(0)
-        cards = eval(users_data.pop(0))
-        data[user_id] = {
-            'step': 'main',
-            'cards': unic_decode(cards),
-            'watchcard': -1,
-            'code': ''
-        }
-    global sessionStorage
-    sessionStorage = data.copy()
-
-
-def data_recovery():
-    FILE = open(config.DIRECTORY + config.DATA_BACKUP_FILE, "r")
-    users_data = eval(FILE.read())
-    users_recovery(users_data)
-
-
 def data_backup():
-    data = sessionStorage.copy()
-
-    users_data = [len(data)]
-    for user_id in data:
-        # users_data += data[user_id].get_backup_data()
-        users_data += [user_id, unic_encode(data[user_id]['cards'])]
-
-    FILE = open(config.DIRECTORY + config.DATA_BACKUP_FILE, "w")
-    FILE.write(str(users_data))
-    FILE.close()
-    time.sleep(static_data.DATA_BACKUP_TIME)
+    logger = logging.getLogger()
+    try:
+        views.save_data(sessionStorage)
+        logger.info('Success!')
+        if len(config.admin_ids) > 0:
+            bot.send_message(config.admin_ids[0], 'Saving data: Success!')
+            data = open(config.DIRECTORY + config.DATA_BACKUP_FILE, 'rb')
+            bot.send_document(config.admin_ids[0], data)
+    except Exception as e:
+        logger.error(f'ERROR:\n{str(e)}')
+        if len(config.admin_ids) > 0:
+            bot.send_message(config.admin_ids[0], 'Saving data: ERROR:\n' + str(e))
 
 
 # Запуск бота
 bot = telebot.TeleBot(config.TOKEN)
 
 try:
-    data_recovery()
+    sessionStorage = views.get_data()
     logging.info('Data recovery: Success!')
     print('Data recovery: Success!')
 except Exception as e:
@@ -122,7 +81,7 @@ logging.info('Server started')
 print('Server started')
 
 if len(config.admin_ids) > 0:
-    bot.send_message(config.admin_ids[0], 'Бот запущен')
+    bot.send_message(config.admin_ids[0], 'Server started')
 
 Backup_Thread = Thread()
 
@@ -164,7 +123,7 @@ def backup_dec(function_to_decorate):
     def wrapped(message):
         global Backup_Thread
         if not Backup_Thread.is_alive():
-            Backup_Thread = Thread(target=data_backup)
+            Backup_Thread = Thread(target=data_backup())
             Backup_Thread.start()
         return function_to_decorate(message)
 
@@ -179,7 +138,6 @@ def checkCards_dec(function_to_decorate):
         user = sessionStorage[chat_id]
         step = user.getStep()
         if len(user.cards) == 0:
-            logging.info(f'main {chat_id}: No Cards')
             bot.send_message(chat_id, 'У вас нет карт', reply_markup=markups.MUP[step])
             return
         return function_to_decorate(message)
@@ -289,14 +247,16 @@ def handle_start(message):
 def handle_step_main_watch(message):
     chat_id = message.chat.id
     user = sessionStorage[chat_id]
+    step = user.getStep()
+    logger = logging.getLogger(step)
+    logger.info(f'{chat_id}: Started')
 
-    logging.info(f'main {chat_id}: Watch Cards')
-    logging.info(f'main {chat_id}: Getting cards')
     keybGR = user.get_cards_keyboard(chat_id, data='watchcard')
-    logging.info(f'main {chat_id}: Got')
     sent = bot.send_message(chat_id, 'Выберите карту (всего карт ' + str(len(user.cards)) + ')',
                             reply_markup=keybGR)
     user.setInline(sent.message_id)
+
+    logger.info(f'{chat_id}: OK')
 
 
 @bot.message_handler(func=lambda message: check_step(message, 'main', '**добавить карту**'), content_types=['text'])
@@ -305,11 +265,15 @@ def handle_step_main_watch(message):
 def handle_step_main_add(message):
     chat_id = message.chat.id
     user = sessionStorage[chat_id]
+    step = user.getStep()
+    logger = logging.getLogger(step)
+    logger.info(f'{chat_id}: Started')
 
-    logging.info(f'main {chat_id}: Add Card')
     user.nextStep('addcard_name')
     sent = bot.send_message(chat_id, 'Введите имя карты', reply_markup=markups.canc_pad)
     sessionStorage[chat_id].setInline(sent.message_id)
+
+    logger.info(f'{chat_id}: OK')
 
 
 @bot.message_handler(func=lambda message: check_step(message, 'main', '**удалить карту**'), content_types=['text'])
@@ -319,15 +283,16 @@ def handle_step_main_add(message):
 def handle_step_main_del(message):
     chat_id = message.chat.id
     user = sessionStorage[chat_id]
+    step = user.getStep()
+    logger = logging.getLogger(step)
+    logger.info(f'{chat_id}: Started')
 
-    logging.info(f'main {chat_id}: Delete Cards')
-
-    logging.info(f'main {chat_id}: Getting cards')
     keybGR = user.get_cards_keyboard(chat_id, data='delete')
-    logging.info(f'main {chat_id}: Got')
 
     sent = bot.send_message(chat_id, 'Выберите карту, которую хотите удалить', reply_markup=keybGR)
     sessionStorage[chat_id].setInline(sent.message_id)
+
+    logger.info(f'{chat_id}: OK')
 
 
 @bot.message_handler(func=lambda message: check_step(message, 'main_addcard_'), content_types=['text'])
@@ -339,14 +304,17 @@ def handle_step_main_addcard(message):
     user = sessionStorage[chat_id]
     step = user.getStep()
     subj = step.split('_')[-1]
+    logger = logging.getLogger(step)
+    logger.info(f'{chat_id}: Started')
 
     if subj == 'name':
-        user.addCard = utils.Card()
+        user.addCard = utils.CardData()
 
     info, added = user.setSubj(subj, text)
     log_info = static_data.MESSAGES[step][info]['forLog']
     user_info = static_data.MESSAGES[step][info]['forUser']
-    logging.info(f"{step} {chat_id}: {log_info}")
+
+    logger.info(f'{chat_id}: {log_info}')
 
     if not added:
         sent = bot.send_message(chat_id, user_info, reply_markup=markups.canc_pad)
@@ -378,7 +346,9 @@ def query_text(query):
 def handle_inline_cancel(call):
     chat_id = call.message.chat.id
     user = sessionStorage[chat_id]
-    logging.info('cancel {chat_id}: Cancel')
+    step = user.getStep()
+    logger = logging.getLogger(step)
+    logger.info(f'{chat_id}: Started')
     user.resetAll()
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
@@ -452,7 +422,9 @@ def handle_inline_watchcard(call):
 def handle_inline_pin_can(call):
     chat_id = call.message.chat.id
     user = sessionStorage[chat_id]
-    logging.info(f'{user.getStep()}  {chat_id}: Cancel')
+    step = user.getStep()
+    logger = logging.getLogger(step)
+    logger.info(f'{chat_id}: Started')
     user.resetAll()
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
@@ -466,7 +438,8 @@ def handle_inline_pin_res(call):
     chat_id = call.message.chat.id
     user = sessionStorage[chat_id]
     step = user.getStep()
-    logging.info(f'{step}  {chat_id}: Reset pin pad')
+    logger = logging.getLogger(step)
+    logger.info(f'{chat_id}: Started')
     text = call.message.text
 
     if step == 'main_addcard_date':
@@ -499,8 +472,8 @@ def handle_inline_pin_acc_watchcard(call):
     chat_id = call.message.chat.id
     user = sessionStorage[chat_id]
     step = user.getStep()
-
-    logging.info(f'{step} {chat_id}: Decrypting')
+    logger = logging.getLogger(step)
+    logger.info(f'{chat_id}: Started')
 
     name = user.getWatchCardName()
     num = user.getWatchCardNum()
@@ -508,7 +481,7 @@ def handle_inline_pin_acc_watchcard(call):
 
     info, decoded, text = user.decodeWatchCard()
     log_info = static_data.MESSAGES[step][info]['forLog']
-    logging.info(f"{step} {chat_id}: {log_info}")
+    logger.info(f'{chat_id}: {log_info}')
     user.resetAll()
 
     if decoded:
@@ -524,14 +497,14 @@ def handle_inline_pin_acc_watchcard(call):
     if not decoded:
         return
 
-    logging.info(f'{step}  {chat_id}: Waiting 5 sec...')
     time.sleep(5)
 
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
                           text='Сообщение устарело.' + card_text,
                           parse_mode='Markdown')
-    logging.info(f'{step}  {chat_id}: Done')
+
+    logger.info(f'{chat_id}: OK')
 
 
 @bot.callback_query_handler(func=lambda call: check_call_step(call, 'pin_acc', 'main_addcard_'))
@@ -541,13 +514,13 @@ def handle_inline_pin_acc_addcard(call):
     user = sessionStorage[chat_id]
     step = user.getStep()
     subj = step.split('_')[-1]
-
-    logging.info(f'{step}  {chat_id}: Checking {subj}')
+    logger = logging.getLogger(step)
+    logger.info(f'{chat_id}: Checking {subj}')
 
     info, added = user.setSubj(subj)
     log_info = static_data.MESSAGES[step][info]['forLog']
     user_info = static_data.MESSAGES[step][info]['forUser']
-    logging.info(f"{step} {chat_id}: {log_info}")
+    logger.info(f'{chat_id}: {log_info}')
 
     if info == 'encode':
         user.resetAll()
@@ -596,11 +569,12 @@ def handle_inline_pin_acc_addcard(call):
     user = sessionStorage[chat_id]
     step = user.getStep()
     subj = step.split('_')[-1]
+    logger = logging.getLogger(step)
+    logger.info(f'{chat_id}: Started')
 
     if step == 'main_watchcard':
         subj = 'code'
 
-    logging.info(f'{step}  {chat_id}: Entering on pin-pad')
     num = (call.data.split('_')).pop()
 
     length, num, digitCount = user.addNumSubj(subj, num)
