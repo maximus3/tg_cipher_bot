@@ -56,10 +56,6 @@ def data_backup():
     try:
         views.save_data(sessionStorage)
         logger.info('Success!')
-        if len(config.admin_ids) > 0:
-            bot.send_message(config.admin_ids[0], 'Saving data: Success!')
-            data = open(config.DIRECTORY + config.DATA_BACKUP_FILE, 'rb')
-            bot.send_document(config.admin_ids[0], data)
     except Exception as e:
         logger.error(f'ERROR:\n{str(e)}')
         if len(config.admin_ids) > 0:
@@ -92,16 +88,16 @@ Backup_Thread = Thread()
 # sessionStorage decorator
 def ss_dec(function_to_decorate):
     @wraps(function_to_decorate)
-    def wrapped(message):
+    def wrapped(message, *args, **kwargs):
         chat_id = message.chat.id
         if chat_id not in sessionStorage:
-            sessionStorage[chat_id] = utils.UserData()
+            sessionStorage[chat_id] = utils.UserData(chat_id)
         elif sessionStorage[chat_id].getInline() is not None:
             bot.edit_message_text(chat_id=chat_id,
                                   message_id=sessionStorage[chat_id].getInline(),
                                   text="Данное сообщение уже устарело")
             sessionStorage[chat_id].resetAll()
-        return function_to_decorate(message)
+        return function_to_decorate(message, *args, **kwargs)
 
     return wrapped
 
@@ -119,12 +115,12 @@ def isAdmin_dec(function_to_decorate):
 
 def backup_dec(function_to_decorate):
     @wraps(function_to_decorate)
-    def wrapped(message):
+    def wrapped(message, *args, **kwargs):
         global Backup_Thread
         if not Backup_Thread.is_alive():
-            Backup_Thread = Thread(target=data_backup())
+            Backup_Thread = Thread(target=data_backup)
             Backup_Thread.start()
-        return function_to_decorate(message)
+        return function_to_decorate(message, *args, **kwargs)
 
     return wrapped
 
@@ -177,9 +173,9 @@ def checkInline_dec(function_to_decorate):
 def check_step(message, step, text=None):
     chat_id = message.chat.id
     cur_step = sessionStorage[chat_id].getStep()
-    if text is None:
-        return cur_step == step
-    return cur_step == step and message.text.lower() == text.lower()
+    condition1 = cur_step == step if step[-1] != '_' else cur_step.startswith(step)
+    condition2 = message.text.lower() == text.lower() if text else True
+    return condition1 and condition2
 
 
 def check_call_step(call, data, step=None):
@@ -241,8 +237,6 @@ def handle_start(message):
 
 
 @bot.message_handler(func=lambda message: check_step(message, 'main', '**мои карты**'), content_types=['text'])
-@ss_dec
-@backup_dec
 @noInline_dec
 @checkCards_dec
 def handle_step_main_watch(message):
@@ -252,7 +246,7 @@ def handle_step_main_watch(message):
     logger = logging.getLogger(step)
     logger.info(f'{chat_id}: Started')
 
-    keybGR = user.get_cards_keyboard(chat_id, data='watchcard')
+    keybGR = user.get_cards_keyboard('watchcard')
     sent = bot.send_message(chat_id, 'Выберите карту (всего карт ' + str(len(user.cards)) + ')',
                             reply_markup=keybGR)
     user.setInline(sent.message_id)
@@ -261,8 +255,6 @@ def handle_step_main_watch(message):
 
 
 @bot.message_handler(func=lambda message: check_step(message, 'main', '**добавить карту**'), content_types=['text'])
-@ss_dec
-@backup_dec
 @noInline_dec
 def handle_step_main_add(message):
     chat_id = message.chat.id
@@ -279,8 +271,6 @@ def handle_step_main_add(message):
 
 
 @bot.message_handler(func=lambda message: check_step(message, 'main', '**удалить карту**'), content_types=['text'])
-@ss_dec
-@backup_dec
 @noInline_dec
 @checkCards_dec
 def handle_step_main_del(message):
@@ -290,7 +280,7 @@ def handle_step_main_del(message):
     logger = logging.getLogger(step)
     logger.info(f'{chat_id}: Started')
 
-    keybGR = user.get_cards_keyboard(chat_id, data='delete')
+    keybGR = user.get_cards_keyboard('delete')
 
     sent = bot.send_message(chat_id, 'Выберите карту, которую хотите удалить', reply_markup=keybGR)
     sessionStorage[chat_id].setInline(sent.message_id)
@@ -299,7 +289,6 @@ def handle_step_main_del(message):
 
 
 @bot.message_handler(func=lambda message: check_step(message, 'main_addcard_'), content_types=['text'])
-@backup_dec
 @noInline_dec
 def handle_step_main_addcard(message):
     chat_id = message.chat.id
@@ -366,7 +355,7 @@ def handle_inline_deletecard(call):
     user = sessionStorage[chat_id]
     name = user.getWatchCardName()
     text = 'Выбрана карта *' + name + '*\n'
-    if call.data.endwith('yes'):
+    if call.data.endswith('yes'):
         user.deleteWatchCard()
         text += 'Карта удалена'
     else:
@@ -410,7 +399,7 @@ def handle_inline_watchcard(call):
     name = user.setWatchCard(num)
     user.resetCode()
 
-    user_info = static_data.MESSAGES[step]['confirmDelete']['forUser'](name)
+    user_info = static_data.MESSAGES[step]['enterCode']['forUser'](name)
 
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,

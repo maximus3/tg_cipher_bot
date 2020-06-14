@@ -5,6 +5,8 @@ from static_data import DATA_BACKUP_TIME
 import os
 import time
 
+import logging
+
 
 def create_tables():
     if os.path.exists(DIRECTORY + DATA_BACKUP_FILE):
@@ -34,6 +36,7 @@ def get_data():
 
 
 def save_data(sessionStorage):
+    logger = logging.getLogger('FUNC')
     prev_name = DIRECTORY + 'prev_' + DATA_BACKUP_FILE
     name = DIRECTORY + DATA_BACKUP_FILE
     if os.path.exists(prev_name):
@@ -49,5 +52,6 @@ def save_data(sessionStorage):
         for card in user.cards:
             Card.create(user=user_db, name=card.name, num=card.num, date=card.date.hex(), cvc=card.cvc.hex(),
                         pin=card.pin.hex())
+    logger.info(f'Going sleep to {DATA_BACKUP_TIME} seconds')
     time.sleep(DATA_BACKUP_TIME)
-    return True
+    return 'ok', True
