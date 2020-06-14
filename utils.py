@@ -192,7 +192,7 @@ class UserData:
         'inline': None,
     }
 
-    def _init__(self, chat_id, data=TEST_DATA):
+    def __init__(self, chat_id, data=TEST_DATA):
         if len(data) == 0:
             data = TEST_DATA
 
@@ -236,7 +236,7 @@ class UserData:
     def setInline(self, inline):
         self._inline = inline
 
-    def resetInline(self, inline):
+    def resetInline(self):
         self._inline = self._defaultValues['inline']
 
     def getInline(self):
