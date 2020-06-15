@@ -53,7 +53,7 @@ MESSAGES = {  # step - short name
         'delete_card': StaticMessage('**Удалить карту**')
     },
     'main': {
-        'watch_card': StaticMessage('Выберите карту\nВсего карт: {}'),
+        'watch_card': StaticMessage('Выберите карту. Всего карт: {}'),
         'add_card': StaticMessage('Введите имя карты'),
         'delete_card': StaticMessage('Выберите карту, которую хотите удалить')
     },

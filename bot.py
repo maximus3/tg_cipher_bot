@@ -176,7 +176,7 @@ def check_step(message, step, text=None):
     chat_id = message.chat.id
     cur_step = sessionStorage[chat_id].getStep()
     condition1 = cur_step == step if step[-1] != '_' else cur_step.startswith(step)
-    condition2 = message.text.lower() == text.lower() if text else True
+    condition2 = message.text.lower() == text.lower() if (text and message.text) else True
     return condition1 and condition2
 
 
