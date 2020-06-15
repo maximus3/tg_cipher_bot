@@ -48,6 +48,7 @@ async def handle(request):
 
 app.router.add_post('/{token}/', handle)
 
+
 # WEBHOOK_END
 
 
@@ -95,8 +96,8 @@ def ss_dec(function_to_decorate):
         elif sessionStorage[chat_id].getInline() is not None:
             bot.edit_message_text(chat_id=chat_id,
                                   message_id=sessionStorage[chat_id].getInline(),
-                                  text="Данное сообщение уже устарело")
-            sessionStorage[chat_id].resetAll()
+                                  text=static_data.MESSAGES['any']['old_message'].forUser)
+            sessionStorage[chat_id].resetInline()
         return function_to_decorate(message, *args, **kwargs)
 
     return wrapped
@@ -132,7 +133,7 @@ def checkCards_dec(function_to_decorate):
         user = sessionStorage[chat_id]
         step = user.getStep()
         if len(user.cards) == 0:
-            bot.send_message(chat_id, 'У вас нет карт', reply_markup=markups.MUP[step])
+            bot.send_message(chat_id, static_data.MESSAGES['any']['no_cards'].forUser, reply_markup=markups.MUP[step])
             return
         return function_to_decorate(message)
 
@@ -157,10 +158,11 @@ def checkInline_dec(function_to_decorate):
         user = sessionStorage[chat_id]
         bot.edit_message_text(chat_id=chat_id,
                               message_id=message_id,
-                              text='Загрузка...\n' + call.message.text,
+                              text=static_data.MESSAGES['any']['loading'].forUser + '\n' + call.message.text,
                               parse_mode='Markdown')
         if user.getInline() is None or user.getInline() != message_id:
-            bot.edit_message_text(chat_id=chat_id, message_id=message_id, text="Данное сообщение уже устарело")
+            bot.edit_message_text(chat_id=chat_id, message_id=message_id,
+                                  text=static_data.MESSAGES['any']['old_message'].forUser)
             return
         user.resetInline()
         return function_to_decorate(call)
@@ -231,12 +233,14 @@ def handle_start(message):
     chat_id = message.chat.id
     step = sessionStorage[chat_id].getStep()
     if step in markups.MUP:
-        bot.send_message(chat_id, static_data.START_TEXT, reply_markup=markups.MUP[step])
+        bot.send_message(chat_id, static_data.MESSAGES['any']['start'].forUser, reply_markup=markups.MUP[step])
     else:
         bot.send_message(chat_id, static_data.START_TEXT)
 
 
-@bot.message_handler(func=lambda message: check_step(message, 'main', '**мои карты**'), content_types=['text'])
+@bot.message_handler(func=lambda message: check_step(message, 'main',
+                                                     static_data.MESSAGES['from_user']['my_cards'].forUser),
+                     content_types=['text'])
 @noInline_dec
 @checkCards_dec
 def handle_step_main_watch(message):
@@ -247,14 +251,16 @@ def handle_step_main_watch(message):
     logger.info(f'{chat_id}: Started')
 
     keybGR = user.get_cards_keyboard('watchcard')
-    sent = bot.send_message(chat_id, 'Выберите карту (всего карт ' + str(len(user.cards)) + ')',
+    sent = bot.send_message(chat_id, static_data.MESSAGES[step]['watch_card'].forUser.format(str(len(user.cards))),
                             reply_markup=keybGR)
     user.setInline(sent.message_id)
 
     logger.info(f'{chat_id}: OK')
 
 
-@bot.message_handler(func=lambda message: check_step(message, 'main', '**добавить карту**'), content_types=['text'])
+@bot.message_handler(func=lambda message: check_step(message, 'main',
+                                                     static_data.MESSAGES['from_user']['add_card'].forUser),
+                     content_types=['text'])
 @noInline_dec
 def handle_step_main_add(message):
     chat_id = message.chat.id
@@ -263,14 +269,16 @@ def handle_step_main_add(message):
     logger = logging.getLogger(step)
     logger.info(f'{chat_id}: Started')
 
-    user.nextStep('addcard_name')
-    sent = bot.send_message(chat_id, 'Введите имя карты', reply_markup=markups.canc_pad)
+    step = user.nextStep('addcard_name')
+    sent = bot.send_message(chat_id, static_data.MESSAGES[step]['start'].forUser, reply_markup=markups.canc_pad)
     sessionStorage[chat_id].setInline(sent.message_id)
 
     logger.info(f'{chat_id}: OK')
 
 
-@bot.message_handler(func=lambda message: check_step(message, 'main', '**удалить карту**'), content_types=['text'])
+@bot.message_handler(func=lambda message: check_step(message, 'main',
+                                                     static_data.MESSAGES['from_user']['delete_card'].forUser),
+                     content_types=['text'])
 @noInline_dec
 @checkCards_dec
 def handle_step_main_del(message):
@@ -282,7 +290,7 @@ def handle_step_main_del(message):
 
     keybGR = user.get_cards_keyboard('delete')
 
-    sent = bot.send_message(chat_id, 'Выберите карту, которую хотите удалить', reply_markup=keybGR)
+    sent = bot.send_message(chat_id, static_data.MESSAGES[step]['delete_card'].forUser, reply_markup=keybGR)
     sessionStorage[chat_id].setInline(sent.message_id)
 
     logger.info(f'{chat_id}: OK')
@@ -303,13 +311,14 @@ def handle_step_main_addcard(message):
         user.addCard = utils.CardData()
 
     info, added = user.setSubj(subj, text)
-    log_info = static_data.MESSAGES[step][info]['forLog']
-    user_info = static_data.MESSAGES[step][info]['forUser']
+    log_info = static_data.MESSAGES[step][info].forLog
+    user_info = static_data.MESSAGES[step][info].forUser
 
     logger.info(f'{chat_id}: {log_info}')
 
     if not added:
-        sent = bot.send_message(chat_id, user_info, reply_markup=markups.canc_pad)
+        sent = bot.send_message(chat_id, user_info + '\n' + static_data.MESSAGES[step]['start'].forUser,
+                                reply_markup=markups.canc_pad)
         user.setInline(sent.message_id)
         return
 
@@ -344,7 +353,7 @@ def handle_inline_cancel(call):
     user.resetAll()
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
-                          text='_Действие отменено_\n' + call.message.text,
+                          text=static_data.MESSAGES['any']['cancel'].forUser + '\n' + call.message.text,
                           parse_mode='Markdown')
 
 
@@ -354,17 +363,17 @@ def handle_inline_deletecard(call):
     chat_id = call.message.chat.id
     user = sessionStorage[chat_id]
     name = user.getWatchCardName()
-    text = 'Выбрана карта *' + name + '*\n'
+    step = user.getStep()
+
+    info = call.data.split('_')[-1]
+    user_info = static_data.MESSAGES[step][info].forUser.format(name)
     if call.data.endswith('yes'):
         user.deleteWatchCard()
-        text += 'Карта удалена'
-    else:
-        text += 'Удаление отменено'
 
     user.resetAll()
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
-                          text=text,
+                          text=user_info,
                           parse_mode='Markdown')
 
 
@@ -378,7 +387,7 @@ def handle_inline_delete(call):
     num = int((call.data.split('_')).pop())
     name = user.setWatchCard(num)
 
-    user_info = static_data.MESSAGES[step]['confirmDelete']['forUser'](name)
+    user_info = static_data.MESSAGES[step]['confirm_delete'].forUser.format(name)
 
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
@@ -399,7 +408,7 @@ def handle_inline_watchcard(call):
     name = user.setWatchCard(num)
     user.resetCode()
 
-    user_info = static_data.MESSAGES[step]['enterCode']['forUser'](name)
+    user_info = static_data.MESSAGES[step]['enter_code'].forUser.format(name)
 
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
@@ -414,13 +423,10 @@ def handle_inline_watchcard(call):
 def handle_inline_pin_can(call):
     chat_id = call.message.chat.id
     user = sessionStorage[chat_id]
-    step = user.getStep()
-    logger = logging.getLogger(step)
-    logger.info(f'{chat_id}: Started')
     user.resetAll()
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
-                          text='_Действие отменено_\n' + call.message.text,
+                          text=static_data.MESSAGES['any']['cancel'].forUser + '\n' + call.message.text,
                           parse_mode='Markdown')
 
 
@@ -432,27 +438,17 @@ def handle_inline_pin_res(call):
     step = user.getStep()
     logger = logging.getLogger(step)
     logger.info(f'{chat_id}: Started')
-    text = call.message.text
+    subj = step.split('_')[-1]
+    name = user.getWatchCardName()
 
-    if step == 'main_addcard_date':
-        user.addCard.resetDate()
-        text = text.split('\n')
-        text[-1] = '--/----'
-        text = '\n'.join(text)
-    else:
-        text = text.replace('-', '#')
-        text = text.replace('#', '')
-        text += '----'
-        if step == 'main_watchcard' or step == 'main_addcard_code':
-            user.resetCode()
-        elif step == 'main_addcard_pin':
-            user.addCard.resetPin()
-        elif step == 'main_addcard_cvc':
-            user.addCard.resetCvc()
-            text.pop()
+    if step == 'main_watchcard':
+        subj = 'code'
+
+    user.resetSubj(subj)
+
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
-                          text=text,
+                          text=static_data.MESSAGES[step]['start'].forUser.format(name),
                           parse_mode='Markdown',
                           reply_markup=markups.pin_pad)
     user.setInline(call.message.message_id)
@@ -469,21 +465,17 @@ def handle_inline_pin_acc_watchcard(call):
 
     name = user.getWatchCardName()
     num = user.getWatchCardNum()
-    card_text = 'Карта: *' + name + '*\n' + 'Номер карты: `' + num + '`\n'
+    card_text = static_data.MESSAGES[step]['basic'].forUser.format(name, num)
 
     info, decoded, text = user.decodeWatchCard()
-    log_info = static_data.MESSAGES[step][info]['forLog']
+    log_info = static_data.MESSAGES[step][info].forLog
+    user_info = static_data.MESSAGES[step][info].forUser.format(card_text, text)
     logger.info(f'{chat_id}: {log_info}')
     user.resetAll()
 
-    if decoded:
-        text = 'Защитный код принят. Данное сообщение исчезнет через 5 секунд.\n' + card_text + text
-    else:
-        text = static_data.MESSAGES[step][info]['forUser']
-
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
-                          text=text,
+                          text=user_info,
                           parse_mode='Markdown')
 
     if not decoded:
@@ -493,7 +485,7 @@ def handle_inline_pin_acc_watchcard(call):
 
     bot.edit_message_text(chat_id=chat_id,
                           message_id=call.message.message_id,
-                          text='Сообщение устарело.' + card_text,
+                          text=static_data.MESSAGES['any']['old_message'].forUser + '\n' + card_text,
                           parse_mode='Markdown')
 
     logger.info(f'{chat_id}: OK')
@@ -506,12 +498,13 @@ def handle_inline_pin_acc_addcard(call):
     user = sessionStorage[chat_id]
     step = user.getStep()
     subj = step.split('_')[-1]
+    name = user.addCard.name
     logger = logging.getLogger(step)
     logger.info(f'{chat_id}: Checking {subj}')
 
     info, added = user.setSubj(subj)
-    log_info = static_data.MESSAGES[step][info]['forLog']
-    user_info = static_data.MESSAGES[step][info]['forUser']
+    log_info = static_data.MESSAGES[step][info].forLog
+    user_info = static_data.MESSAGES[step][info].forUser.format(name)
     logger.info(f'{chat_id}: {log_info}')
 
     if info == 'encode':
@@ -523,10 +516,10 @@ def handle_inline_pin_acc_addcard(call):
         return
 
     if not added:
-        user.resetSubj()
+        user.resetSubj(subj)
         bot.edit_message_text(chat_id=chat_id,
                               message_id=call.message.message_id,
-                              text=user_info + call.message.text,
+                              text=user_info + '\n' + static_data.MESSAGES[step]['start'].forUser,
                               parse_mode='Markdown',
                               reply_markup=markups.pin_pad)
         user.setInline(call.message.message_id)
@@ -534,10 +527,10 @@ def handle_inline_pin_acc_addcard(call):
 
     if subj == 'pin':
         user.cards.append(user.addCard)
-        name = user.getWatchCardName()
+        user.resetAll()
         bot.edit_message_text(chat_id=chat_id,
                               message_id=call.message.message_id,
-                              text='Карта *' + name + '* успешно добавлена!',
+                              text=user_info,
                               parse_mode='Markdown')
         return
 

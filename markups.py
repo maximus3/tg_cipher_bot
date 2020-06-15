@@ -1,4 +1,5 @@
 from telebot import types
+from static_data import MESSAGES
 
 pin_pad = types.InlineKeyboardMarkup(row_width=3)
 pin_btn = [types.InlineKeyboardButton(text=str(i), callback_data='pin_' + str(i)) for i in range(10)]
@@ -16,9 +17,9 @@ canc_but = types.InlineKeyboardButton(text='Отмена', callback_data='cancel
 canc_pad.add(canc_but)
 
 markupMain = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-markupMain.row('**Мои карты**')
-markupMain.row('**Добавить карту**')
-markupMain.row('**Удалить карту**')
+markupMain.row(MESSAGES['from_user']['my_cards'].forUser)
+markupMain.row(MESSAGES['from_user']['add_card'].forUser)
+markupMain.row(MESSAGES['from_user']['delete_card'].forUser)
 
 inlineMarkupDelete = types.InlineKeyboardMarkup()
 delete_yes_btn = types.InlineKeyboardButton(text='Удалить', callback_data='deletecard_yes')
