@@ -58,11 +58,11 @@ class CardData:
     }
 
     def __init__(self, data=None):
-        self.name = None
-        self.num = None
-        self.date = None
-        self.cvc = None
-        self.pin = None
+        self.name = ''
+        self.num = ''
+        self.date = ''
+        self.cvc = ''
+        self.pin = ''
         if data is not None:
             self.name = data['name']
             self.num = data['num']
@@ -106,7 +106,7 @@ class CardData:
         if len(self.date) != 4 and len(self.date) != 6:
             return 'length', False
         month = int(self.date[:2])
-        year = (self.date[2:])
+        year = int(self.date[2:])
         if year < 100:
             year += 2000
 
@@ -159,7 +159,7 @@ class CardData:
 
     def addNumPin(self, num):
         self.pin += num
-        return len(self.pin), num, 3
+        return len(self.pin), num, 4
 
     subjFunc = {
         'set': {
@@ -296,7 +296,7 @@ class UserData:
         self._code = self._defaultValues['code']
 
     def decodeWatchCard(self):
-        card = self.addCard
+        card = self.cards[self._watchCardNum]
         try:
             date = decrypt(self._code, card.date)
             cvc = decrypt(self._code, card.cvc)
@@ -311,7 +311,7 @@ class UserData:
 
     def setCode(self):
         code = self._code
-        if not 4 < len(code) < 16:
+        if not 3 < len(code) < 17:
             return 'length', False
 
         '''
@@ -326,17 +326,20 @@ class UserData:
     def setSubj(self, subj, text=None):
         if subj == 'code':
             return self.setCode()
+        card = self.addCard
         if text is not None:
-            return self.addCard.subjFunc['set'][subj](text)
-        return self.addCard.subjFunc['set'][subj](self._code)
+            return self.addCard.subjFunc['set'][subj](card, text)
+        return self.addCard.subjFunc['set'][subj](card, self._code)
 
-    def reserSubj(self, subj):
+    def resetSubj(self, subj):
         if subj == 'code':
             return self.resetCode()
-        return self.addCard.subjFunc['reset'][subj]()
+        card = self.addCard
+        return self.addCard.subjFunc['reset'][subj](card)
 
     def addNumSubj(self, subj, num):
         if subj == 'code':
             self._code += num
             return len(self._code), num, 4
-        return self.addCard.subjFunc['addNum'][subj](num)
+        card = self.addCard
+        return self.addCard.subjFunc['addNum'][subj](card, num)
