@@ -1,0 +1,6 @@
+scheduler:
+  db_dump:
+    trigger: cron
+    hour: 3
+    config:
+      send_logs: true
