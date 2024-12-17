@@ -11,9 +11,7 @@ from configargparse import Namespace
 PROJECT_PATH = Path(__file__).parent.parent.resolve()
 
 
-def make_alembic_config(
-    cmd_opts: Union[Namespace, SimpleNamespace], base_path: Path = PROJECT_PATH
-) -> Config:
+def make_alembic_config(cmd_opts: Union[Namespace, SimpleNamespace], base_path: Path = PROJECT_PATH) -> Config:
     """
     Создает объект конфигурации alembic на основе аргументов командной строки,
     подменяет относительные пути на абсолютные.
@@ -21,9 +19,7 @@ def make_alembic_config(
     path_to_folder = cmd_opts.config
     # Подменяем путь до файла alembic.ini на абсолютный
     if not os.path.isabs(cmd_opts.config):
-        cmd_opts.config = os.path.join(
-            base_path, cmd_opts.config + 'alembic.ini'
-        )
+        cmd_opts.config = os.path.join(base_path, cmd_opts.config + 'alembic.ini')
 
     config = Config(
         file_=cmd_opts.config,

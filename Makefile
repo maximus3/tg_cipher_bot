@@ -6,17 +6,28 @@ VENV = .venv
 ifeq ($(OS),Windows_NT)
     PYTHON_EXECUTABLE = python
     VENV_BIN = $(VENV)/Scripts
+    DOCKER_COMPOSE = docker-compose
+    DOCKER = docker
 else
-    PYTHON_EXECUTABLE = python3.11
+    PYTHON_EXECUTABLE = python3.12
     VENV_BIN = $(VENV)/bin
+    ifeq ($(shell uname -s),Darwin)
+        # DOCKER_COMPOSE = nerdctl compose
+        # DOCKER = nerdctl
+        DOCKER_COMPOSE = docker-compose
+        DOCKER = docker
+    else
+        DOCKER_COMPOSE = docker-compose
+        DOCKER = docker
+    endif
 endif
 
-POETRY_VERSION=1.2
+POETRY_VERSION=1.8.5
 POETRY_RUN = $(VENV_BIN)/poetry run
 
 # Manually define main variables
 
-APPLICATION_NAME = tg_cipher_bot
+APPLICATION_NAME = bot
 
 args := $(wordlist 2, 100, $(MAKECMDGOALS))
 ifndef args
@@ -76,11 +87,6 @@ poetry-add: ##@Code Add new dependency
 up: ##@Application Up Bot
 	$(POETRY_RUN) python -m bot
 
-
-.PHONY: up-scheduler
-up-scheduler: ##@Application Up Scheduler
-	$(POETRY_RUN) python -m bot.scheduler
-
 .PHONY: migrate
 migrate:  ##@Database Do all migrations in database
 	$(POETRY_RUN) alembic upgrade $(args)
@@ -91,11 +97,11 @@ revision:  ##@Database Create new revision file automatically with prefix (ex. 2
 
 .PHONY: downgrade
 downgrade:  ##@Database Downgrade migration on one revision
-	alembic downgrade -1
+	$(POETRY_RUN) alembic downgrade -1
 
 .PHONY: db
 db: ##@Database Docker up db
-	docker-compose up -d postgres
+	$(DOCKER_COMPOSE) up -d postgres
 
 .PHONY: test
 test: ##@Testing Runs pytest with coverage
@@ -133,65 +139,82 @@ test-cov-mp: ##@Testing Runs pytest with coverage report with multiprocessing
 format: ###@Code Formats all files
 	$(POETRY_RUN) autoflake --recursive --in-place --remove-all-unused-imports $(CODE)
 	$(POETRY_RUN) isort $(CODE)
-	$(POETRY_RUN) black --line-length 79 --target-version py311 --skip-string-normalization $(CODE)
+	$(POETRY_RUN) black --line-length 120 --target-version py312 --skip-string-normalization $(CODE)
 	$(POETRY_RUN) unify --in-place --recursive $(CODE)
+	$(POETRY_RUN) ruff format $(CODE)
+
+.PHONY: ruff-check
+ruff-check: ###@Code Run ruff check
+	$(POETRY_RUN) ruff check
+
+.PHONY: flake8
+flake8: ###@Code Run flake8
+	$(POETRY_RUN) flake8 --jobs 4 --statistics --show-source $(CODE)
+
+.PHONY: mypy
+mypy: ###@Code Run mypy
+	$(POETRY_RUN) mypy $(CODE)
+
+
+.PHONY: fast-lint
+fast-lint: ruff-check flake8 mypy ###@Code Fast lint code (without pylint)
+	$(POETRY_RUN) black --line-length 120 --target-version py312 --skip-string-normalization --check $(CODE)
+	$(POETRY_RUN) pytest --dead-fixtures --dup-fixtures
+	$(POETRY_RUN) safety check --full-report || echo "Safety check finished full-report"
 
 .PHONY: lint
-lint: ###@Code Lint code
-	$(POETRY_RUN) flake8 --jobs 4 --statistics --show-source $(CODE)
+lint: fast-lint ###@Code Lint code
 	$(POETRY_RUN) pylint $(CODE)
-	$(POETRY_RUN) mypy $(CODE)
-	$(POETRY_RUN) black --line-length 79 --target-version py311 --skip-string-normalization --check $(CODE)
-	$(POETRY_RUN) pytest --dead-fixtures --dup-fixtures
-	$(POETRY_RUN) safety check --full-report || echo "Safety check failed"
 
 .PHONY: check
 check: gen format lint test-mp ###@Code Format and lint code then run tests
 
 .PHONY: docker-up
 docker-up: ##@Application Docker up
-	docker-compose up --remove-orphans
+	$(DOCKER_COMPOSE) up --remove-orphans
 
 .PHONY: docker-up-d
 docker-up-d: ##@Application Docker up detach
-	docker-compose up -d --remove-orphans
-	docker-compose up -d --force-recreate nginx
+	$(DOCKER_COMPOSE) up -d --remove-orphans
 
 .PHONY: docker-build
 docker-build: ##@Application Docker build
-	docker-compose build
+	$(DOCKER_COMPOSE) build
 
 .PHONY: docker-up-build
 docker-up-build: ##@Application Docker up detach with build
-	docker-compose up -d --build --remove-orphans
+	$(DOCKER_COMPOSE) up -d --build --remove-orphans
 
 .PHONY: docker-down
 docker-down: ##@Application Docker down
-	docker-compose down
+	$(DOCKER_COMPOSE) down
 
 .PHONY: docker-stop
 docker-stop: ##@Application Docker stop some app
-	docker-compose stop $(args)
+	$(DOCKER_COMPOSE) stop $(args)
 
 .PHONY: docker-clean
 docker-clean: ##@Application Docker prune -f
-	docker image prune -f
+	$(DOCKER) image prune -f
 
 .PHONY: docker
 docker: docker-clean docker-build docker-up-d docker-clean ##@Application Docker prune, up, run and prune
 
 .PHONY: open
 open: ##@Docker Open container in docker
-	docker exec -it $(args) /bin/bash
+	$(DOCKER) exec -it $(args) /bin/bash
 
 .PHONY: docker-run
 docker-run: ##@Docker Run sh in paused docker container
-	docker run --rm -it --entrypoint bash $(args)
-
+	$(DOCKER) run --rm -it --entrypoint bash $(args)
 
 .PHONY: docker-migrate
 docker-migrate: ##@Application Migrate db in docker
-	docker exec $(APPLICATION_NAME) make migrate $(args)
+	$(DOCKER) exec $(APPLICATION_NAME) make migrate $(args)
+
+.PHONY: docker-downgrade
+docker-downgrade: ##@Application Downgrade db in docker
+	$(DOCKER) exec $(APPLICATION_NAME) make downgrade $(args)
 
 .PHONY: commit
 commit: gen format lint ##@Git Commit with message all files (with lint)
@@ -219,11 +242,13 @@ pull: ##@Git Pull from origin
 git: check commit ##@Git Check and commit
 
 .PHONY: update
-update: pull dump-local docker-build ##@Application Update docker app
-	@make docker-down
+update: pull db wait-db-ready dump-local docker-build ##@Application Update docker app
+	@make docker-stop
 	@make delete-container-data
 	@make docker
+	@make wait-db-ready
 	@make docker-migrate head
+	@make docker-prune-cache
 
 .PHONY: update-server
 update-server: ##@Application Update docker app on server
@@ -243,7 +268,7 @@ dump: ##@Database Dump database from server
 	$(eval DB_USERNAME=$(shell cat deploy/db_username.txt))
 
 	echo "Dumping database to $(FILENAME)"
-	ssh -p $(PORT) $(USERNAME)@$(HOST) "docker exec postgres_container pg_dump -f $(FILENAME) -d $(DB_NAME) -U $(DB_USERNAME);docker cp postgres_container:$(FILENAME) $(FILENAME);docker exec postgres_container rm $(FILENAME);exit;"
+	ssh -p $(PORT) $(USERNAME)@$(HOST) "docker exec postgres pg_dump -f $(FILENAME) -d $(DB_NAME) -U $(DB_USERNAME);docker cp postgres:$(FILENAME) $(FILENAME);docker exec postgres rm $(FILENAME);exit;"
 	scp -P $(PORT) $(USERNAME)@$(HOST):$(FILENAME) db/$(FILENAME)
 	ssh -p $(PORT) $(USERNAME)@$(HOST) "rm $(FILENAME); exit;"
 	echo "Done"
@@ -253,9 +278,9 @@ dump-local: ##@Database Dump database local
 	$(eval FILENAME=backup_$(shell date +%Y%m%d_%H%M%S).sql)
 
 	echo "Dumping database to $(FILENAME)"
-	docker exec postgres_container pg_dump -f $(FILENAME) -d $(POSTGRES_DB) -U $(POSTGRES_USER)
-	docker cp postgres_container:$(FILENAME) db/$(FILENAME)
-	docker exec postgres_container rm $(FILENAME)
+	$(DOCKER) exec postgres pg_dump -f $(FILENAME) -d $(POSTGRES_DB) -U $(POSTGRES_USER)
+	$(DOCKER) cp postgres:$(FILENAME) db/$(FILENAME)
+	$(DOCKER) exec postgres rm $(FILENAME)
 	echo "Done"
 
 .PHONY: restore-local
@@ -266,9 +291,9 @@ restore-local: ##@Database Restore database local
 	$(eval DB_USERNAME=$(shell cat deploy/db_username.txt))
 
 	echo "Restoring local database from $(FILENAME)"
-	docker cp db/$(FILENAME) postgres_container:$(FILENAME)
-	docker exec postgres_container psql -d $(DB_NAME) -U $(DB_USERNAME) -f $(FILENAME)
-	docker exec postgres_container rm $(FILENAME)
+	$(DOCKER) cp db/$(FILENAME) postgres:$(FILENAME)
+	$(DOCKER) exec postgres psql -d $(DB_NAME) -U $(DB_USERNAME) -f $(FILENAME)
+	$(DOCKER) exec postgres rm $(FILENAME)
 	echo "Done"
 
 .PHONY: restore-server
@@ -283,7 +308,7 @@ restore-server: ##@Database Restore database on server
 
 	echo "Restoring database from $(FILENAME)"
 	scp -P $(PORT) db/$(FILENAME) $(USERNAME)@$(HOST):$(FILENAME)
-	ssh -p $(PORT) $(USERNAME)@$(HOST) "docker cp $(FILENAME) postgres_container:$(FILENAME); docker exec postgres_container psql -d $(DB_NAME) -U $(DB_USERNAME) -f (FILENAME); docker exec postgres_container rm $(FILENAME); rm (FILENAME); exit;"
+	ssh -p $(PORT) $(USERNAME)@$(HOST) "docker cp $(FILENAME) postgres:$(FILENAME); docker exec postgres psql -d $(DB_NAME) -U $(DB_USERNAME) -f $(FILENAME); docker exec postgres rm $(FILENAME); rm $(FILENAME); exit;"
 	echo "Done"
 
 .PHONY: file-copy
@@ -341,7 +366,7 @@ get-scheduler-logs: ##@Application Get scheduler logs
 
 .PHONY: run-job
 run-job: docker-build ##@Application Run scheduler job in docker
-	docker-compose run --rm --entrypoint make scheduler run-job-local $(args)
+	$(DOCKER_COMPOSE) run --rm --entrypoint make scheduler run-job-local $(args)
 
 .PHONY: run-job-local
 run-job-local: ##@Application Run scheduler job local
@@ -376,10 +401,6 @@ gen: ##@Application Generate files
 .PHONY: sqlalchemy
 sqlalchemy: ##@Application Open sqlalchemy shell
 	$(VENV_BIN)/python -m tools sqlalchemy $(args)
-
-.PHONY: hash-password
-hash-password: ##@Application Hash password
-	$(VENV_BIN)/python -m tools hash-password $(args)
 
 .PHONY: vpn-install
 vpn-install: ##@VPN Install VPN
@@ -434,14 +455,35 @@ update-dev-branch: ##@Git Rebase dev on main branch
 
 .PHONY: delete-container-data
 delete-container-data: ##@Docker Prune containers
-	docker container prune -f
+	$(DOCKER) container prune -f
 
-.PHONY: ssh-tunnel
-ssh-tunnel: ##@Server SSH tunnel to server for grafana
-	$(eval PORT=$(shell cat deploy/port.txt))
-	$(eval HOST=$(shell cat deploy/host.txt))
-	$(eval USERNAME=$(shell cat deploy/username.txt))
-	ssh -p $(PORT) -L 3000:127.0.0.1:3000 -C -N $(USERNAME)@$(HOST)
+.PHONY: docker-prune-cache
+docker-prune-cache: ##@Docker Prune docker cache
+	$(DOCKER) builder prune --filter until=24h -f
+
+.PHONY: open-pg
+open-pg-env: ##@Database open psql in docker database
+	$(DOCKER) exec -it postgres psql -d $(POSTGRES_DB) -U $(POSTGRES_USER)
+
+.PHONY: get-pg-use-port
+get-pg-use-port: ##@Application Get apps using postgres port
+	sudo ss -lptn 'sport = :5432'
+
+.PHONY: wait-postgres-ready
+wait-db-ready: ##@Application Wait for postgres to be ready
+	@echo "Waiting for Postgres to be ready..."
+	attempts=0; \
+	max_attempts=30; \
+	while ! $(DOCKER_COMPOSE) exec postgres pg_isready -U $(POSTGRES_USER) -d $(POSTGRES_DB) > /dev/null 2>&1; do \
+		if [ $$attempts -ge $$max_attempts ]; then \
+			@echo "Postgres is not ready after $$max_attempts attempts. Exiting."; \
+			exit 1; \
+		fi; \
+		echo "Postgres is not ready yet. Waiting... ($$attempts/$$max_attempts)"; \
+		sleep 2; \
+		attempts=`expr $$attempts + 1`; \
+	done
+	@echo "Postgres is ready."
 
 %::
 	echo $(MESSAGE)

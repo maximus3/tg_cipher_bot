@@ -14,9 +14,7 @@ START_TEXT = """
 Пожалуйста, не забывайте защитный код, потому что он не хранится в системе и восстановить его будет невозможно!
 Шифрование реализованно алгоритмом AES-128.
 Вот в таком виде хранится информация по катре "тест 1234":
-""" + str(
-    TEST_DATA[0]
-)
+""" + str(TEST_DATA[0])
 
 ADMIN_COMMANDS = [
     {'command': '/null', 'description': 'Обнуление шага'},
@@ -55,9 +53,7 @@ MESSAGES = {  # step - short name
         'delete_card': StaticMessage('Выберите карту, которую хотите удалить'),
     },
     'main_addcard_name': {
-        'nameExists': StaticMessage(
-            'Карта с таким именем  уже существует', 'Name already exists'
-        ),
+        'nameExists': StaticMessage('Карта с таким именем  уже существует', 'Name already exists'),
         'length': StaticMessage(
             'Слишком длинное название (не более 32 символов)',
             'Name is too long',
@@ -67,29 +63,21 @@ MESSAGES = {  # step - short name
             'Wrong format of name',
         ),
         'ok': StaticMessage(
-            '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nПридумайте защитный код (до 16 символов)\n'
-            + TEMPLATES['code'],
+            '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nПридумайте защитный код (до 16 символов)\n' + TEMPLATES['code'],
             'Name format is OK',
         ),
     },
     'main_addcard_num': {
-        'digits': StaticMessage(
-            'Номер карты должен состоять только из цифр', 'Not digits'
-        ),
-        'length': StaticMessage(
-            'Номер карты должен состоять из 16 символов', 'Not enough symbols'
-        ),
+        'digits': StaticMessage('Номер карты должен состоять только из цифр', 'Not digits'),
+        'length': StaticMessage('Номер карты должен состоять из 16 символов', 'Not enough symbols'),
         'num': StaticMessage('Номер набран неправильно', 'Not correct num'),
         'ok': StaticMessage(
-            '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите дату окончания срока действия карты\n'
-            + TEMPLATES['date'],
+            '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите дату окончания срока действия карты\n' + TEMPLATES['date'],
             'Num format is OK',
         ),
     },
     'main_addcard_code': {
-        'length': StaticMessage(
-            'Защитный код должен содержать от 4 до 16 символов', 'Length error'
-        ),
+        'length': StaticMessage('Защитный код должен содержать от 4 до 16 символов', 'Length error'),
         'ok': StaticMessage('Введите номер карты', 'Code is OK'),
     },
     'main_addcard_date': {
@@ -97,52 +85,36 @@ MESSAGES = {  # step - short name
             'Пожалуйста, введите 4 или 6 цифр даты (ммгггг или ммгг)',
             'Length error',
         ),
-        'incorrect': StaticMessage(
-            'Введена некорректная дата', 'Format error'
-        ),
-        'encode': StaticMessage(
-            'Произошла ошибка при кодировании', 'Encode error'
-        ),
+        'incorrect': StaticMessage('Введена некорректная дата', 'Format error'),
+        'encode': StaticMessage('Произошла ошибка при кодировании', 'Encode error'),
         'ok': StaticMessage(
-            '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите CVC код\n'
-            + TEMPLATES['cvc'],
+            '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите CVC код\n' + TEMPLATES['cvc'],
             'Date is OK',
         ),
     },
     'main_addcard_cvc': {
-        'length': StaticMessage(
-            'CVC код должен содержать от 3 до 4 символов', 'Length error'
-        ),
-        'encode': StaticMessage(
-            'Произошла ошибка при кодировании', 'Encode error'
-        ),
+        'length': StaticMessage('CVC код должен содержать от 3 до 4 символов', 'Length error'),
+        'encode': StaticMessage('Произошла ошибка при кодировании', 'Encode error'),
         'ok': StaticMessage(
-            '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите PIN код\n'
-            + TEMPLATES['pin'],
+            '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВведите PIN код\n' + TEMPLATES['pin'],
             'CVC is OK',
         ),
     },
     'main_addcard_pin': {
-        'length': StaticMessage(
-            'PIN код должен содержать 4 символа', 'Length error'
-        ),
-        'encode': StaticMessage(
-            'Произошла ошибка при кодировании', 'Encode error'
-        ),
+        'length': StaticMessage('PIN код должен содержать 4 символа', 'Length error'),
+        'encode': StaticMessage('Произошла ошибка при кодировании', 'Encode error'),
         'ok': StaticMessage('Карта *{}* успешно добавлена!', 'PIN is OK'),
     },
     'main_delete': {
         'confirm_delete': StaticMessage(
-            'Выбрана карта *{}*\nВы уверены, что хотите удалить ее из базы? Отмена '
-            'невозможна!'
+            'Выбрана карта *{}*\nВы уверены, что хотите удалить ее из базы? Отмена ' 'невозможна!'
         ),
         'yes': StaticMessage('Выбрана карта *{}*\nКарта удалена'),
         'no': StaticMessage('Выбрана карта *{}*\nУдаление отменено'),
     },
     'main_watchcard': {
         'decode': StaticMessage(
-            'Произошла ошибка при декодировании.\nВозможно, защитный код введен неправильно. '
-            'Попробуйте еще раз',
+            'Произошла ошибка при декодировании.\nВозможно, защитный код введен неправильно. ' 'Попробуйте еще раз',
             'Decode error',
         ),
         'digit': StaticMessage(
@@ -154,8 +126,7 @@ MESSAGES = {  # step - short name
             'Decode is OK',
         ),
         'enter_code': StaticMessage(
-            '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВыбрана карта *{}*\nВведите защитный код:\n'
-            + TEMPLATES['code']
+            '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nВыбрана карта *{}*\nВведите защитный код:\n' + TEMPLATES['code']
         ),
         'basic': StaticMessage('Карта: *{}*\n' + 'Номер карты: `{}`'),
     },

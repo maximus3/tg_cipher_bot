@@ -5,38 +5,38 @@ description = "Secure save info about your cards data"
 authors = []
 
 [tool.poetry.dependencies]
-python = "^3.11"
-pydantic = {extras = ["dotenv"], version = "^1.9.0"}
-SQLAlchemy = "^1.4.39"
-alembic = "^1.8.1"
-psycopg2-binary = "^2.9.3"
-APScheduler = "^3.9.1"
-aiogram = "^2.22.2"
-loguru = "^0.6.0"
-asyncpg = "^0.27.0"
-Jinja2 = "^3.1.2"
-PyYAML = "^6.0"
+python = "^3.12"
+pydantic = {version = "^2.9.2", extras = ["dotenv"]}
+sqlalchemy = "^2.0.36"
+alembic = "^1.14.0"
+psycopg2-binary = "^2.9.10"
+asyncpg = "^0.30.0"
+jinja2 = "^3.1.4"
+loguru = "^0.7.3"
+loki-logger-handler = "^1.0.2"
+aiogram = "^3.15.0"
+pydantic-settings = "^2.7.0"
 
 [tool.poetry.group.dev.dependencies]
-black = "^22.1.0"
-autoflake = "^1.4"
-isort = "^5.10.1"
+black = "^24.10.0"
+ruff = "^0.8.3"
+autoflake = "^2.3.1"
+isort = "^5.13.2"
+mypy = "^1.13.0"
 unify = "^0.5"
-flake8 = "^4.0.1"
-pylint = "^2.12.2"
-mypy = "^0.941"
-safety = "^1.10.3"
-pytest = "^7.1.0"
-pytest-cov = "^3.0.0"
+pylint = "^3.3.2"
+flake8 = "^7.1.1"
+safety = "^3.2.13"
+pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
+pytest-mock = "^3.14.0"
 pytest-deadfixtures = "^2.2.1"
-pytest-mock = "^3.7.0"
-ConfigArgParse = "^1.5.3"
-SQLAlchemy-Utils = "^0.38.3"
-httpx = "^0.23.0"
-factory-boy = "^3.2.1"
-pytest-asyncio = "^0.19.0"
-pytest-xdist = "^2.5.0"
-types-PyYAML = "^6.0.12.8"
+pytest-asyncio = "^0.25.0"
+pytest-xdist = "^3.6.1"
+configargparse = "^1.7"
+sqlalchemy-utils = "^0.41.2"
+factory-boy = "^3.3.1"
+types-python-dateutil = "^2.9.0.20241206"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -62,10 +62,10 @@ exclude_lines = [
 show_missing = true
 skip_empty = true
 skip_covered = true
-fail_under = 50
+fail_under = 80
 omit = [
   "*/__init__.py",
-  "app/db/migrator/env.py",
+  "bot/database/migrator/env.py",
 ]
 
 [tool.coverage.html]
@@ -117,11 +117,14 @@ max-attributes=10
 max-public-methods=10
 
 [tool.pylint.format]
-max-line-length = 79
+max-line-length = 120
+
+[tool.pylint."SIMILARITIES"]
+min-similarity-lines=10
 
 [tool.black]
-line-length = 79
-target-version = ['py310']
+line-length = 120
+target-version = ['py312']
 include = '\.pyi?$'
 exclude = '''
 (
@@ -143,10 +146,10 @@ exclude = '''
 [tool.isort]
 balanced_wrapping = true
 default_section = "THIRDPARTY"
-known_first_party = "tests,app"
+known_first_party = "tests,bot,tools"
 lines_after_imports = 2
 multi_line_output = 3
-line_length = 79
+line_length = 120
 include_trailing_comma = true
 
 [tool.mypy]
@@ -162,3 +165,33 @@ plugins = ["sqlalchemy.ext.mypy.plugin"]
 module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+
+[tool.ruff]
+# Same as Black.
+line-length = 120
+indent-width = 4
+
+# Assume Python 3.12
+target-version = "py312"
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+select = ["E4", "E7", "E9", "F"]
+ignore = []
+
+# Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
+# overlap with the use of a formatter, like Black, but we can override this behavior by
+# explicitly adding the rule.
+# extend-select = ["E501"]
+
+# Avoid trying to fix flake8-bugbear (`B`) violations.
+ unfixable = ["B"]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 120
+
+[tool.ruff.format]
+# 5. Use single quotes for non-triple-quoted strings.
+quote-style = "single"

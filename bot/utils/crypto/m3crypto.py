@@ -14,7 +14,6 @@ def check_key(key):
 
 
 def encrypt(key, data='', filename=None):
-
     if not check_key(key):
         return None
 
@@ -53,9 +52,7 @@ def encrypt(key, data='', filename=None):
             crypted_data.extend(crypted_part)
 
     if filename:
-        out_path = os.path.join(
-            os.path.dirname(filename), 'crypted_' + os.path.basename(filename)
-        )
+        out_path = os.path.join(os.path.dirname(filename), 'crypted_' + os.path.basename(filename))
 
         with open(out_path, 'xb') as ff:
             ff.write(bytes(crypted_data))
@@ -65,7 +62,6 @@ def encrypt(key, data='', filename=None):
 
 
 def decrypt(key, data='', filename=None):
-
     if not check_key(key):
         return None
 

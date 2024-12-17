@@ -9,22 +9,12 @@ def wrong_format_text(text, tp):
         return False
     elif tp == 'rus1':
         for i in text:
-            if (
-                (not ('а' <= i <= 'я'))
-                and i != ' '
-                and (not ('0' <= i <= '9'))
-                and i != 'ё'
-            ):
+            if (not ('а' <= i <= 'я')) and i != ' ' and (not ('0' <= i <= '9')) and i != 'ё':
                 return True
         return False
     elif tp == 'eng1':
         for i in text:
-            if (
-                (not ('A' <= i <= 'Z'))
-                and i != ' '
-                and (not ('0' <= i <= '9'))
-                and (not ('a' <= i <= 'z'))
-            ):
+            if (not ('A' <= i <= 'Z')) and i != ' ' and (not ('0' <= i <= '9')) and (not ('a' <= i <= 'z')):
                 return True
         return False
     elif tp == 'login':
@@ -38,11 +28,7 @@ def wrong_format_text(text, tp):
         if len(text) > 32:
             return True
         for i in text:
-            if (
-                (not ('A' <= i <= 'Z'))
-                and (not ('0' <= i <= '9'))
-                and (not ('a' <= i <= 'z'))
-            ):
+            if (not ('A' <= i <= 'Z')) and (not ('0' <= i <= '9')) and (not ('a' <= i <= 'z')):
                 return True
         return False
     elif tp == 'ruseng1':

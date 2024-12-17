@@ -1,9 +1,10 @@
-from pathlib import Path
+import pathlib
 
-from pydantic import BaseSettings, Field
+import pydantic
+import pydantic_settings
 
 
-class DefaultSettings(BaseSettings):
+class DefaultSettings(pydantic_settings.BaseSettings):
     """
     Default configs for application.
 
@@ -13,30 +14,39 @@ class DefaultSettings(BaseSettings):
     standard settings for local development.
     """
 
-    ENV: str = Field('local', env='ENV')
-    PROJECT_NAME: str = Field('PROJECT_NAME', env='PROJECT_NAME')
-    DEBUG: bool = Field(True, env='DEBUG')
+    ENV: str = pydantic.Field('local')
+    PROJECT_NAME: str = pydantic.Field('PROJECT_NAME')
+    DEBUG: bool = pydantic.Field(True)
 
-    TG_BOT_TOKEN: str = Field('', env='PROJECT_NAME')
+    TG_BOT_TOKEN: pydantic.SecretStr = pydantic.Field('')
 
-    POSTGRES_DB: str = Field('data', env='POSTGRES_DB')
-    POSTGRES_HOST: str = Field('localhost', env='POSTGRES_HOST')
-    POSTGRES_USER: str = Field('pguser', env='POSTGRES_USER')
-    POSTGRES_PORT: int = Field('5432', env='POSTGRES_PORT')
-    POSTGRES_PASSWORD: str = Field('pgpswd', env='POSTGRES_PASSWORD')
+    POSTGRES_DB: str = pydantic.Field('data')
+    POSTGRES_HOST: str = pydantic.Field('localhost')
+    POSTGRES_USER: str = pydantic.Field('pguser')
+    POSTGRES_PORT: int = pydantic.Field('5432')
+    POSTGRES_PASSWORD: str = pydantic.Field('pgpswd')
 
-    LOGGING_FORMAT = (
+    LOGGING_FORMAT: str = (
         '%(filename)s %(funcName)s [%(thread)d] '
         '[LINE:%(lineno)d]# %(levelname)-8s '
         '[%(asctime)s.%(msecs)03d] %(name)s: '
         '%(message)s'
     )
-    LOGGING_FILE_DIR = Path('logs')
-    LOGGING_APP_FILE = LOGGING_FILE_DIR / 'logfile.log'
-    LOGGING_SCHEDULER_FILE = LOGGING_FILE_DIR / 'scheduler_logfile.log'
+    LOGGING_FILE_DIR: pathlib.Path = pathlib.Path('logs')
+    LOGGING_BOT_FILE: pathlib.Path = LOGGING_FILE_DIR / 'logfile.log'
 
-    BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
-    CONFIG_FILENAME: str = 'config.yaml'
+    BASE_DIR: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent.parent
+
+    TG_HELPER_BOT_TOKEN: str = pydantic.Field(
+        '1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234',
+    )
+    TG_ERROR_CHAT_ID: str = pydantic.Field('')
+    TG_DB_DUMP_CHAT_ID: str = pydantic.Field('')
+    TG_LOG_SEND_CHAT_ID: str = pydantic.Field('')
+
+    LOKI_PUSH_URL: str = pydantic.Field(
+        'http://loki:3100/loki/api/v1/push',
+    )
 
     @property
     def database_settings(self) -> dict[str, str | int]:
@@ -56,11 +66,8 @@ class DefaultSettings(BaseSettings):
         """
         Get uri for connection with database.
         """
-        return (
-            'postgresql+asyncpg://{user}:{password}@'
-            '{host}:{port}/{database}'.format(
-                **self.database_settings,
-            )
+        return 'postgresql+asyncpg://{user}:{password}@' '{host}:{port}/{database}'.format(
+            **self.database_settings,
         )
 
     @property
@@ -68,12 +75,12 @@ class DefaultSettings(BaseSettings):
         """
         Get uri for connection with database.
         """
-        return (
-            'postgresql://{user}:{password}@{host}:{port}/{database}'.format(
-                **self.database_settings,
-            )
+        return 'postgresql://{user}:{password}@{host}:{port}/{database}'.format(
+            **self.database_settings,
         )
 
-    class Config:
-        env_file: Path | str = '.env'
-        env_file_encoding = 'utf-8'
+    model_config = pydantic_settings.SettingsConfigDict(
+        env_file='.env',
+        env_file_encoding='utf-8',
+        extra='ignore',
+    )

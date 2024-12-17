@@ -18,12 +18,8 @@ settings = get_settings()
 config.set_section_option(section, 'POSTGRES_DB', settings.POSTGRES_DB)
 config.set_section_option(section, 'POSTGRES_HOST', settings.POSTGRES_HOST)
 config.set_section_option(section, 'POSTGRES_USER', settings.POSTGRES_USER)
-config.set_section_option(
-    section, 'POSTGRES_PASSWORD', settings.POSTGRES_PASSWORD
-)
-config.set_section_option(
-    section, 'POSTGRES_PORT', str(settings.POSTGRES_PORT)
-)
+config.set_section_option(section, 'POSTGRES_PASSWORD', settings.POSTGRES_PASSWORD)
+config.set_section_option(section, 'POSTGRES_PORT', str(settings.POSTGRES_PORT))
 
 
 # Interpret the config file for Python logging.
@@ -85,16 +81,12 @@ def run_migrations_online() -> None:  # pragma: no cover
         )
 
         with connectable.connect() as connection:
-            context.configure(
-                connection=connection, target_metadata=target_metadata
-            )
+            context.configure(connection=connection, target_metadata=target_metadata)
 
             with context.begin_transaction():
                 context.run_migrations()
     else:
-        context.configure(
-            connection=connectable, target_metadata=target_metadata
-        )
+        context.configure(connection=connectable, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

@@ -23,8 +23,7 @@ from bot.utils import utils
 
 
 logging.basicConfig(
-    format=u'%(filename)s %(funcName)s [LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s] %(name)s: %('
-    u'message)s',
+    format='%(filename)s %(funcName)s [LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s] %(name)s: %(' 'message)s',
     level=logging.INFO,
     filename=config.DIRECTORY + 'cipher.log',
 )
@@ -135,9 +134,7 @@ def checkInline_dec(function_to_decorate):
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=message_id,
-            text=static_data.MESSAGES['any']['loading'].forUser
-            + '\n'
-            + call.message.text,
+            text=static_data.MESSAGES['any']['loading'].forUser + '\n' + call.message.text,
             parse_mode='Markdown',
         )
         if user.getInline() is None or user.getInline() != message_id:
@@ -158,14 +155,8 @@ def checkInline_dec(function_to_decorate):
 def check_step(message, step, text=None):
     chat_id = message.chat.id
     cur_step = sessionStorage[chat_id].getStep()
-    condition1 = (
-        cur_step == step if step[-1] != '_' else cur_step.startswith(step)
-    )
-    condition2 = (
-        message.text.lower() == text.lower()
-        if (text and message.text)
-        else True
-    )
+    condition1 = cur_step == step if step[-1] != '_' else cur_step.startswith(step)
+    condition2 = message.text.lower() == text.lower() if (text and message.text) else True
     return condition1 and condition2
 
 
@@ -210,9 +201,7 @@ def getbackup(message):
 @isAdmin_dec
 def null(message):
     chat_id = message.chat.id
-    bot.send_message(
-        chat_id, 'Ваш шаг был: ' + sessionStorage[chat_id].getStep()
-    )
+    bot.send_message(chat_id, 'Ваш шаг был: ' + sessionStorage[chat_id].getStep())
     sessionStorage[chat_id].resetAll()
 
 
@@ -234,9 +223,7 @@ def handle_start(message):
 
 
 @bot.message_handler(
-    func=lambda message: check_step(
-        message, 'main', static_data.MESSAGES['from_user']['my_cards'].forUser
-    ),
+    func=lambda message: check_step(message, 'main', static_data.MESSAGES['from_user']['my_cards'].forUser),
     content_types=['text'],
 )
 @noInline_dec
@@ -251,9 +238,7 @@ def handle_step_main_watch(message):
     keybGR = user.get_cards_keyboard('watchcard')
     sent = bot.send_message(
         chat_id,
-        static_data.MESSAGES[step]['watch_card'].forUser.format(
-            str(len(user.cards))
-        ),
+        static_data.MESSAGES[step]['watch_card'].forUser.format(str(len(user.cards))),
         reply_markup=keybGR,
     )
     user.setInline(sent.message_id)
@@ -262,9 +247,7 @@ def handle_step_main_watch(message):
 
 
 @bot.message_handler(
-    func=lambda message: check_step(
-        message, 'main', static_data.MESSAGES['from_user']['add_card'].forUser
-    ),
+    func=lambda message: check_step(message, 'main', static_data.MESSAGES['from_user']['add_card'].forUser),
     content_types=['text'],
 )
 @noInline_dec
@@ -379,16 +362,12 @@ def handle_inline_cancel(call):
     bot.edit_message_text(
         chat_id=chat_id,
         message_id=call.message.message_id,
-        text=static_data.MESSAGES['any']['cancel'].forUser
-        + '\n'
-        + call.message.text,
+        text=static_data.MESSAGES['any']['cancel'].forUser + '\n' + call.message.text,
         parse_mode='Markdown',
     )
 
 
-@bot.callback_query_handler(
-    func=lambda call: check_call_step(call, 'deletecard_')
-)
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'deletecard_'))
 @checkInline_dec
 def handle_inline_deletecard(call):
     chat_id = call.message.chat.id
@@ -420,9 +399,7 @@ def handle_inline_delete(call):
     num = int((call.data.split('_')).pop())
     name = user.setWatchCard(num)
 
-    user_info = static_data.MESSAGES[step]['confirm_delete'].forUser.format(
-        name
-    )
+    user_info = static_data.MESSAGES[step]['confirm_delete'].forUser.format(name)
 
     bot.edit_message_text(
         chat_id=chat_id,
@@ -434,9 +411,7 @@ def handle_inline_delete(call):
     user.setInline(call.message.message_id)
 
 
-@bot.callback_query_handler(
-    func=lambda call: check_call_step(call, 'watchcard_')
-)
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'watchcard_'))
 @checkInline_dec
 def handle_inline_watchcard(call):
     chat_id = call.message.chat.id
@@ -468,9 +443,7 @@ def handle_inline_pin_can(call):
     bot.edit_message_text(
         chat_id=chat_id,
         message_id=call.message.message_id,
-        text=static_data.MESSAGES['any']['cancel'].forUser
-        + '\n'
-        + call.message.text,
+        text=static_data.MESSAGES['any']['cancel'].forUser + '\n' + call.message.text,
         parse_mode='Markdown',
     )
 
@@ -501,9 +474,7 @@ def handle_inline_pin_res(call):
     user.setInline(call.message.message_id)
 
 
-@bot.callback_query_handler(
-    func=lambda call: check_call_step(call, 'pin_acc', 'main_watchcard')
-)
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'pin_acc', 'main_watchcard'))
 @checkInline_dec
 def handle_inline_pin_acc_watchcard(call):
     chat_id = call.message.chat.id
@@ -518,9 +489,7 @@ def handle_inline_pin_acc_watchcard(call):
 
     info, decoded, text = user.decodeWatchCard()
     log_info = static_data.MESSAGES[step][info].forLog
-    user_info = static_data.MESSAGES[step][info].forUser.format(
-        card_text, text
-    )
+    user_info = static_data.MESSAGES[step][info].forUser.format(card_text, text)
     logger.info(f'{chat_id}: {log_info}')
     user.resetAll()
 
@@ -539,18 +508,14 @@ def handle_inline_pin_acc_watchcard(call):
     bot.edit_message_text(
         chat_id=chat_id,
         message_id=call.message.message_id,
-        text=static_data.MESSAGES['any']['old_message'].forUser
-        + '\n'
-        + card_text,
+        text=static_data.MESSAGES['any']['old_message'].forUser + '\n' + card_text,
         parse_mode='Markdown',
     )
 
     logger.info(f'{chat_id}: OK')
 
 
-@bot.callback_query_handler(
-    func=lambda call: check_call_step(call, 'pin_acc', 'main_addcard_')
-)
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'pin_acc', 'main_addcard_'))
 @checkInline_dec
 def handle_inline_pin_acc_addcard(call):
     chat_id = call.message.chat.id
@@ -581,9 +546,7 @@ def handle_inline_pin_acc_addcard(call):
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
-            text=user_info
-            + '\n'
-            + static_data.MESSAGES[step]['start'].forUser,
+            text=user_info + '\n' + static_data.MESSAGES[step]['start'].forUser,
             parse_mode='Markdown',
             reply_markup=markups.pin_pad,
         )
@@ -616,9 +579,7 @@ def handle_inline_pin_acc_addcard(call):
     user.setInline(call.message.message_id)
 
 
-@bot.callback_query_handler(
-    func=lambda call: check_call_step(call, 'pin_', 'main_')
-)
+@bot.callback_query_handler(func=lambda call: check_call_step(call, 'pin_', 'main_'))
 @checkInline_dec
 def handle_inline_pin_acc_addcard(call):
     chat_id = call.message.chat.id
@@ -643,23 +604,15 @@ def handle_inline_pin_acc_addcard(call):
         text = text.replace('-', '#')
         text = text.replace('#', '')
 
-        text_for_send.append(
-            text + '#' * (length - 1) + num + '-' * max(digitCount - length, 0)
-        )
-        text_for_send.append(
-            text + '#' * length + '-' * max(digitCount - length, 0)
-        )
+        text_for_send.append(text + '#' * (length - 1) + num + '-' * max(digitCount - length, 0))
+        text_for_send.append(text + '#' * length + '-' * max(digitCount - length, 0))
     else:
         text = text.replace('-', '')
         if length < 3:
             text = text.replace('/', '')
-            text_for_send.append(
-                text + num + '-' * (max(digitCount - 4 - length, 0)) + '/----'
-            )
+            text_for_send.append(text + num + '-' * (max(digitCount - 4 - length, 0)) + '/----')
         else:
-            text_for_send.append(
-                text + num + '-' * (max(digitCount - length, 0))
-            )
+            text_for_send.append(text + num + '-' * (max(digitCount - length, 0)))
 
     for send_text in text_for_send:
         bot.edit_message_text(

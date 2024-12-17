@@ -12,16 +12,16 @@ from bot.schemas import gen as gen_schemas
 
 
 TYPE_TO_FUZZY = {
-    'UUID': 'Faker(\'uuid4\')',
-    'TIMESTAMP': 'Faker(\'date_time\')',
+    'UUID': "Faker('uuid4')",
+    'TIMESTAMP': "Faker('date_time')",
     'INTEGER': 'fuzzy.FuzzyInteger(1, 10000)',
-    'DATETIME': 'Faker(\'date_time\')',
+    'DATETIME': "Faker('date_time')",
     'VARCHAR': 'fuzzy.FuzzyText()',
     'FLOAT': 'fuzzy.FuzzyFloat(0, 1)',
     'BOOLEAN': 'fuzzy.FuzzyChoice([True, False])',
     'TEXT': 'fuzzy.FuzzyText(length=64)',
     'ARRAY': '[]  # type: ignore',
-    'JSON': '\'{}\'',
+    'JSON': "'{}'",
 }
 
 
@@ -38,9 +38,7 @@ def make_data(
 
     dir_for_create = pathlib.Path(settings.BASE_DIR) / 'tests' / 'factory_lib'
 
-    db_models = sorted(
-        models.BaseModel.__subclasses__(), key=lambda m: m.__tablename__
-    )
+    db_models = sorted(models.BaseModel.__subclasses__(), key=lambda m: m.__tablename__)
 
     data_for_gen = {
         '__init__': gen_schemas.DataForGen(

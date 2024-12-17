@@ -11,10 +11,10 @@ from uuid import uuid4
 import pytest
 from alembic.command import upgrade
 from alembic.config import Config
+from app.config import get_settings
+from app.database.connection import SessionManager
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
-from bot.config import get_settings
-from bot.database.connection import SessionManager
 from tests.utils import make_alembic_config
 
 

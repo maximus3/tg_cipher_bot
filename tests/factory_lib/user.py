@@ -10,4 +10,6 @@ class UserFactory(Factory):
     class Meta:
         model = User
 
-    chat_id = fuzzy.FuzzyText()
+    tg_id = fuzzy.FuzzyText()
+    tg_username = fuzzy.FuzzyText()
+    tg_name = fuzzy.FuzzyText()

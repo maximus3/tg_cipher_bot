@@ -90,6 +90,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+*.session
 
 # Spyder project settings
 .spyderproject
@@ -108,6 +109,8 @@ venv.bak/
 .idea/
 .vscode/
 
+.ruff_cache/
+
 # database
 *.db
 *.sql
@@ -122,4 +125,3 @@ deploy/*
 
 logs/*
 !logs/README.md
-!logs/scheduler/README.md

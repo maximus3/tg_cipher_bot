@@ -134,7 +134,6 @@ class CardData:
 
 
 class UserData:
-
     _defaultValues = {
         'admin': False,
         'step': 'main',
@@ -212,11 +211,7 @@ class UserData:
         keybGR = types.InlineKeyboardMarkup(row_width=1)
 
         for i, card in enumerate(self.cards):
-            keybGR.add(
-                types.InlineKeyboardButton(
-                    text=card.name, callback_data=data + '_' + str(i)
-                )
-            )
+            keybGR.add(types.InlineKeyboardButton(text=card.name, callback_data=data + '_' + str(i)))
 
         keybGR.add(canc_but)
         return keybGR
@@ -229,11 +224,7 @@ class UserData:
                     id=str(i),
                     title=card.name,
                     input_message_content=types.InputTextMessageContent(
-                        message_text='Карта *'
-                        + card.name
-                        + '*\nНомер: `'
-                        + str(card.num)
-                        + '`',
+                        message_text='Карта *' + card.name + '*\nНомер: `' + str(card.num) + '`',
                         parse_mode='Markdown',
                     ),
                     reply_markup=None,
@@ -269,17 +260,7 @@ class UserData:
         if not (date.isdigit() and cvc.isdigit() and pin.isdigit()):
             return 'digit', False, ''
 
-        text = (
-            'Дата: '
-            + date[:2]
-            + '/'
-            + date[2:]
-            + '\nCVC-код: '
-            + cvc
-            + '\nPIN-код: _'
-            + pin
-            + '_'
-        )
+        text = 'Дата: ' + date[:2] + '/' + date[2:] + '\nCVC-код: ' + cvc + '\nPIN-код: _' + pin + '_'
         return 'ok', True, text
 
     def setCode(self):
@@ -287,12 +268,12 @@ class UserData:
         if not 3 < len(code) < 17:
             return 'length', False
 
-        '''
+        """
         for symbol in key:
             if ord(symbol) > 0xff:
                 # That key won\'t work. Try another using only latin alphabet and numbers
                 return False
-        '''
+        """
 
         return 'ok', True
 

@@ -8,11 +8,7 @@ from bot.schemas import gen as gen_schemas
 
 
 def main(*args: tp.Any, **kwargs: tp.Any) -> None:
-    jinja2_env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(
-            pathlib.Path(__file__).parent / 'templates'
-        )
-    )
+    jinja2_env = jinja2.Environment(loader=jinja2.FileSystemLoader(pathlib.Path(__file__).parent / 'templates'))
     template = jinja2_env.get_template('_list_of_gens.py.jinja2')
     _gen(
         gen_name='_list_of_gens',
@@ -33,16 +29,12 @@ def main(*args: tp.Any, **kwargs: tp.Any) -> None:
         },
     )
 
-    from ._list_of_gens import (  # pylint: disable=import-outside-toplevel
-        list_of_gens,
-    )
+    from ._list_of_gens import list_of_gens  # pylint: disable=import-outside-toplevel
 
     for gen_dict in list_of_gens:
         _gen(
             gen_dict['name'],  # type: ignore
-            *gen_dict['func'](  # type: ignore
-                jinja2_env=gen_dict['jinja2_env'], *args, **kwargs
-            ),
+            *gen_dict['func'](jinja2_env=gen_dict['jinja2_env'], *args, **kwargs),  # type: ignore
         )
 
 
@@ -72,4 +64,4 @@ def _gen(
                     **data_for_gen.gen_kwargs,
                 )
             )
-        logger.info('Generated {}.', name)
+        logger.info('Generated {} for {}.', name, gen_name)

@@ -1,66 +1,31 @@
-import logging
-import sys
+import aiogram
+from aiogram.fsm.storage import memory
 
-import loguru
-from aiogram import Bot, Dispatcher
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-
-from bot.config import DefaultSettings, get_settings
-from bot.handlers import list_of_register_functions
+from bot import config, handlers, logger_config, middlewares
 
 
-def register_handlers(dp: Dispatcher) -> None:
+def bind_routers(dp: aiogram.Dispatcher) -> None:
     """
-    Register all handlers to bot.
+    Bind all routers to dispatcher.
     """
-    for register_handler in list_of_register_functions:
-        register_handler(dp)
+    for router in handlers.list_of_routers:
+        dp.include_router(router)
 
 
-class InterceptHandler(logging.Handler):
-    def emit(self, record: logging.LogRecord) -> None:
-        # Get corresponding Loguru level if it exists
-        try:
-            level = loguru.logger.level(record.levelname).name
-        except ValueError:
-            level = record.levelno  # type: ignore
-
-        # Find caller from where originated the logged message
-        frame, depth = logging.currentframe(), 2
-        while frame.f_code.co_filename == logging.__file__:  # type: ignore
-            frame = frame.f_back  # type: ignore
-            depth += 1
-
-        loguru.logger.opt(depth=depth, exception=record.exc_info).log(
-            level,
-            record.getMessage().replace('{', r'{{').replace('}', r'}}'),
-            extra={},
-        )
-
-
-def configure_logger(settings: DefaultSettings) -> None:
-    loguru.logger.remove()
-    loguru.logger.add(
-        sink=sys.stderr, serialize=not settings.DEBUG, enqueue=True
-    )
-    loguru.logger.add(
-        settings.LOGGING_APP_FILE,
-        rotation='500 MB',
-        serialize=True,
-        enqueue=True,
-    )
-    logging.getLogger('sqlalchemy.engine').setLevel('INFO')
-
-
-def get_bot(set_up_logger: bool = True) -> tuple[Bot, Dispatcher]:
+def get_bot(set_up_logger: bool = True) -> tuple[aiogram.Bot, aiogram.Dispatcher]:
     """
     Creates bot and all dependable objects.
     """
-    description = 'Cipher bot'
+    settings = config.get_settings()
 
-    settings = get_settings()
-    bot = Bot(token=settings.TG_BOT_TOKEN)
-    dp = Dispatcher(bot, storage=MemoryStorage())
+    bot = aiogram.Bot(token=settings.TG_BOT_TOKEN.get_secret_value())
+    dp = aiogram.Dispatcher(storage=memory.MemoryStorage())
 
-    register_handlers(dp)
+    dp.update.outer_middleware(middlewares.UniqueIDMiddleware())
+
+    bind_routers(dp)
+
+    if set_up_logger:
+        logger_config.configure_logger(settings, log_file=settings.LOGGING_BOT_FILE, application='bot')
+
     return bot, dp

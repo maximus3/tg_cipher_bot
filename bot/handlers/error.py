@@ -8,9 +8,7 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_errors_handler(error_bot_blocked, exception=BotBlocked)
 
 
-async def error_bot_blocked(
-    update: types.Update, exception: BotBlocked
-) -> bool:
+async def error_bot_blocked(update: types.Update, exception: BotBlocked) -> bool:
     # Update: объект события от Telegram. Exception: объект исключения
     # Здесь можно как-то обработать блокировку, например, удалить пользователя из БД
     logger = logging.getLogger(__name__)

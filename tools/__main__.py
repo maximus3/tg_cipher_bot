@@ -1,6 +1,6 @@
 import argparse
 
-from tools import gen, load_config, open_sqlalchemy, run_job
+from tools import gen, open_sqlalchemy
 
 
 if __name__ == '__main__':
@@ -19,13 +19,9 @@ if __name__ == '__main__':
     )
     args = arg_parser.parse_args()
     match args.tool_name:
-        case 'runjob':
-            run_job.main(*args.tool_args)
         case 'gen':
             gen.main(*args.tool_args)
         case 'sqlalchemy':
             open_sqlalchemy.main(*args.tool_args)
-        case 'load_config':
-            load_config.main(*args.tool_args)
         case _:
             raise ValueError(f'Unknown tool: {args.tool_name}')
